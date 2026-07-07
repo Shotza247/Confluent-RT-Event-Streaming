@@ -1,0 +1,178 @@
+[
+    {
+        "label": "Producer",
+        "importPath": "confluent_kafka",
+        "description": "confluent_kafka",
+        "isExtraImport": true,
+        "detail": "confluent_kafka",
+        "documentation": {}
+    },
+    {
+        "label": "Consumer",
+        "importPath": "confluent_kafka",
+        "description": "confluent_kafka",
+        "isExtraImport": true,
+        "detail": "confluent_kafka",
+        "documentation": {}
+    },
+    {
+        "label": "json",
+        "kind": 6,
+        "isExtraImport": true,
+        "importPath": "json",
+        "description": "json",
+        "detail": "json",
+        "documentation": {}
+    },
+    {
+        "label": "random",
+        "kind": 6,
+        "isExtraImport": true,
+        "importPath": "random",
+        "description": "random",
+        "detail": "random",
+        "documentation": {}
+    },
+    {
+        "label": "time",
+        "kind": 6,
+        "isExtraImport": true,
+        "importPath": "time",
+        "description": "time",
+        "detail": "time",
+        "documentation": {}
+    },
+    {
+        "label": "datetime",
+        "importPath": "datetime",
+        "description": "datetime",
+        "isExtraImport": true,
+        "detail": "datetime",
+        "documentation": {}
+    },
+    {
+        "label": "timedelta",
+        "importPath": "datetime",
+        "description": "datetime",
+        "isExtraImport": true,
+        "detail": "datetime",
+        "documentation": {}
+    },
+    {
+        "label": "read_config",
+        "kind": 2,
+        "importPath": "client",
+        "description": "client",
+        "peekOfCode": "def read_config():\n    config = {}\n    with open(\"client.properties\") as fh:\n        for line in fh:\n            line = line.strip()\n            if len(line) != 0 and line[0] != \"#\":\n                parameter, value = line.strip().split(\"=\", 1)\n                config[parameter] = value.strip()\n    return config\n# ------------------------------------------------------",
+        "detail": "client",
+        "documentation": {}
+    },
+    {
+        "label": "random_date",
+        "kind": 2,
+        "importPath": "client",
+        "description": "client",
+        "peekOfCode": "def random_date(year):\n    start = datetime(year, 1, 1)\n    end = datetime(year, 12, 31)\n    delta = end - start\n    random_days = random.randint(0, delta.days)\n    return (start + timedelta(days=random_days)).strftime(\"%Y-%m-%d\")\ndef generate_application():\n    global application_counter\n    customer = random.choice(customers)\n    customer_id = customer[\"customer_id\"]",
+        "detail": "client",
+        "documentation": {}
+    },
+    {
+        "label": "generate_application",
+        "kind": 2,
+        "importPath": "client",
+        "description": "client",
+        "peekOfCode": "def generate_application():\n    global application_counter\n    customer = random.choice(customers)\n    customer_id = customer[\"customer_id\"]\n    name = customer[\"name\"]\n    first_name = name.split()[0].lower()\n    email = f\"{first_name}.{customer_id.lower()}@example.com\"\n    country = \"South Africa\"\n    province = random.choice(provinces)\n    tax_year = random.randint(2010, 2025)",
+        "detail": "client",
+        "documentation": {}
+    },
+    {
+        "label": "produce",
+        "kind": 2,
+        "importPath": "client",
+        "description": "client",
+        "peekOfCode": "def produce(topic, config):\n    producer = Producer(config)\n    for _ in range(30):\n        application = generate_application()\n        key = application[\"customer_id\"]\n        value = json.dumps(application)\n        producer.produce(\n            topic,\n            key=key,\n            value=value",
+        "detail": "client",
+        "documentation": {}
+    },
+    {
+        "label": "consume",
+        "kind": 2,
+        "importPath": "client",
+        "description": "client",
+        "peekOfCode": "def consume(topic, config):\n    config[\"group.id\"] = \"tax_evaluation_group\"\n    config[\"auto.offset.reset\"] = \"earliest\"\n    consumer = Consumer(config)\n    consumer.subscribe([topic])\n    try:\n        while True:\n            msg = consumer.poll(1.0)\n            if msg is not None and msg.error() is None:\n                key = msg.key().decode(\"utf-8\")",
+        "detail": "client",
+        "documentation": {}
+    },
+    {
+        "label": "main",
+        "kind": 2,
+        "importPath": "client",
+        "description": "client",
+        "peekOfCode": "def main():\n    config = read_config()\n    topic = \"tax-evaluation-applications\"\n    produce(topic, config)\n    consume(topic, config)\nmain()",
+        "detail": "client",
+        "documentation": {}
+    },
+    {
+        "label": "customers",
+        "kind": 5,
+        "importPath": "client",
+        "description": "client",
+        "peekOfCode": "customers = [\n    {\"customer_id\": \"CUST-1001\", \"name\": \"John Nkosi\"},\n    {\"customer_id\": \"CUST-1002\", \"name\": \"Sarah Johnson\"},\n    {\"customer_id\": \"CUST-1003\", \"name\": \"Lerato Eva Brown\"},\n    {\"customer_id\": \"CUST-1004\", \"name\": \"Emma Williams\"},\n    {\"customer_id\": \"CUST-1005\", \"name\": \"Daniel Van Jones\"},\n    {\"customer_id\": \"CUST-1006\", \"name\": \"Thabo Miller\"},\n    {\"customer_id\": \"CUST-1007\", \"name\": \"David Wilson\"},\n    {\"customer_id\": \"CUST-1008\", \"name\": \"Sophia Mvambo\"},\n    {\"customer_id\": \"CUST-1009\", \"name\": \"James Kutlwano Anderson\"},",
+        "detail": "client",
+        "documentation": {}
+    },
+    {
+        "label": "\"\"\"countries",
+        "kind": 5,
+        "importPath": "client",
+        "description": "client",
+        "peekOfCode": "\"\"\"countries = [\n    \"South Africa\",\n    \"United Kingdom\",\n    \"United States\",\n    \"Canada\",\n    \"Australia\",\n    \"Germany\",\n    \"France\",\n    \"India\",\n    \"Brazil\",",
+        "detail": "client",
+        "documentation": {}
+    },
+    {
+        "label": "provinces",
+        "kind": 5,
+        "importPath": "client",
+        "description": "client",
+        "peekOfCode": "provinces = [\n    \"Gauteng\",\n    \"Free State\",\n    \"KwaZulu-Natal\",\n    \"Mpumalanga\",\n    \"Western Cape\",\n    \"Eastern Cape\",\n    \"Limpopo\",\n    \"North West\",\n    \"Northern Cape\"",
+        "detail": "client",
+        "documentation": {}
+    },
+    {
+        "label": "statuses",
+        "kind": 5,
+        "importPath": "client",
+        "description": "client",
+        "peekOfCode": "statuses = [\n    \"Submitted\",\n    \"Pending Review\",\n    \"Under Audit\",\n    \"Approved\",\n    \"Rejected\",\n    \"Processing\",\n    \"Refund Issued\",\n    \"Payment Outstanding\"\n]",
+        "detail": "client",
+        "documentation": {}
+    },
+    {
+        "label": "employment_types",
+        "kind": 5,
+        "importPath": "client",
+        "description": "client",
+        "peekOfCode": "employment_types = [\n    \"Full-Time\",\n    \"Part-Time\",\n    \"Self-Employed\",\n    \"Contractor\",\n    \"Retired\"\n]\n#currencies = [\"ZAR\"]\napplication_counter = 10001\n# ------------------------------------------------------",
+        "detail": "client",
+        "documentation": {}
+    },
+    {
+        "label": "#currencies",
+        "kind": 5,
+        "importPath": "client",
+        "description": "client",
+        "peekOfCode": "#currencies = [\"ZAR\"]\napplication_counter = 10001\n# ------------------------------------------------------\n# Helper Functions\n# ------------------------------------------------------\ndef random_date(year):\n    start = datetime(year, 1, 1)\n    end = datetime(year, 12, 31)\n    delta = end - start\n    random_days = random.randint(0, delta.days)",
+        "detail": "client",
+        "documentation": {}
+    },
+    {
+        "label": "application_counter",
+        "kind": 5,
+        "importPath": "client",
+        "description": "client",
+        "peekOfCode": "application_counter = 10001\n# ------------------------------------------------------\n# Helper Functions\n# ------------------------------------------------------\ndef random_date(year):\n    start = datetime(year, 1, 1)\n    end = datetime(year, 12, 31)\n    delta = end - start\n    random_days = random.randint(0, delta.days)\n    return (start + timedelta(days=random_days)).strftime(\"%Y-%m-%d\")",
+        "detail": "client",
+        "documentation": {}
+    }
+]
