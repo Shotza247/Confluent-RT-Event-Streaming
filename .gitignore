@@ -1,1 +1,9 @@
+# Never commit real Kafka credentials
 client.properties
+.streamlit/secrets.toml
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
