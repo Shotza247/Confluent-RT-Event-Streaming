@@ -1,6 +1,8 @@
 import streamlit as st
 import json
 import pandas as pd
+import plotly.express as px
+import plotly.graph_objects as go
 from confluent_kafka import Consumer
 from datetime import datetime
 
@@ -12,9 +14,66 @@ TOPIC = "tax-evaluation-applications"
 
 st.set_page_config(page_title="Tax Applications Dashboard", layout="wide")
 
+# ---- Minimal dark / warm-neutral palette for charts ----
+BG = "#1c1b1a"
+GRID = "#39362f"
+TEXT = "#e8e2d6"
+ACCENTS = ["#c9a227", "#b08968", "#8c7853", "#d9c8b4", "#a67c52", "#6f6259"]
+
+CHART_LAYOUT = dict(
+    paper_bgcolor=BG,
+    plot_bgcolor=BG,
+    font=dict(color=TEXT, family="Inter, sans-serif"),
+    margin=dict(l=30, r=20, t=40, b=30),
+    xaxis=dict(gridcolor=GRID, zerolinecolor=GRID),
+    yaxis=dict(gridcolor=GRID, zerolinecolor=GRID),
+    colorway=ACCENTS,
+)
+
+
+def style(fig):
+    fig.update_layout(**CHART_LAYOUT)
+    return fig
+
 
 @st.cache_resource
 def load_config(path=CONFIG_PATH):
+    """Load Kafka client config.
+
+    Priority:
+    1. Streamlit secrets (st.secrets["kafka"]) — used on Streamlit Community
+       Cloud, where client.properties is never committed to the repo.
+    2. Local client.properties file — used for local development.
+
+    st.secrets raises StreamlitSecretNotFoundError (rather than just being
+    empty) when no secrets.toml exists anywhere at all, which is the normal
+    case for local dev — so that specific error is treated the same as
+    "no kafka secrets configured" and we fall through to the local file.
+    """
+    try:
+        has_kafka_secret = "kafka" in st.secrets
+    except st.errors.StreamlitSecretNotFoundError:
+        has_kafka_secret = False
+
+    if has_kafka_secret:
+        # st.secrets returns an AttrDict-like mapping; convert to plain dict
+        # and make sure keys/values are strings.
+        #
+        # Defensive: if the secrets.toml used unquoted dotted keys (e.g.
+        # bootstrap.servers = "...") TOML parses that as a NESTED TABLE
+        # (bootstrap -> {servers: "..."}) rather than a literal key, which
+        # confluent-kafka can't understand. Flatten any such nested tables
+        # back into dotted keys so this works either way.
+        raw = dict(st.secrets["kafka"])
+        flat = {}
+        for k, v in raw.items():
+            if hasattr(v, "items"):
+                for sub_k, sub_v in v.items():
+                    flat[f"{k}.{sub_k}"] = str(sub_v)
+            else:
+                flat[str(k)] = str(v)
+        return flat
+
     config = {}
     with open(path) as fh:
         for line in fh:
@@ -117,11 +176,6 @@ def live_dashboard():
         total = len(df)
         avg_tax = pd.to_numeric(df.get("tax_due"), errors="coerce").mean()
         avg_income = pd.to_numeric(df.get("income"), errors="coerce").mean()
-        by_status = (
-            df["status"].value_counts().rename_axis("status").reset_index(name="count")
-            if "status" in df.columns
-            else pd.DataFrame()
-        )
 
         col1, col2, col3, col4 = st.columns(4)
         col1.metric("Total events", total)
@@ -132,9 +186,94 @@ def live_dashboard():
             df["customer_id"].nunique() if "customer_id" in df.columns else 0,
         )
 
-        if not by_status.empty:
-            st.markdown("**Status distribution**")
-            st.dataframe(by_status, use_container_width=True)
+        st.divider()
+        chart_col1, chart_col2 = st.columns(2)
+
+        # --- Status distribution ---
+        if "status" in df.columns:
+            by_status = (
+                df["status"].value_counts().rename_axis("status").reset_index(name="count")
+            )
+            fig_status = px.bar(
+                by_status.sort_values("count"),
+                x="count",
+                y="status",
+                orientation="h",
+                title="Applications by Status",
+            )
+            fig_status.update_traces(marker_line_width=0)
+            chart_col1.plotly_chart(style(fig_status), use_container_width=True)
+
+        # --- Employment type breakdown (donut) ---
+        if "employment_type" in df.columns:
+            by_emp = (
+                df["employment_type"]
+                .value_counts()
+                .rename_axis("employment_type")
+                .reset_index(name="count")
+            )
+            fig_emp = px.pie(
+                by_emp,
+                names="employment_type",
+                values="count",
+                hole=0.55,
+                title="Employment Type Mix",
+            )
+            fig_emp.update_traces(marker=dict(line=dict(color=BG, width=2)))
+            chart_col2.plotly_chart(style(fig_emp), use_container_width=True)
+
+        chart_col3, chart_col4 = st.columns(2)
+
+        # --- Avg tax_due by province ---
+        if {"province", "tax_due"}.issubset(df.columns):
+            by_province = (
+                df.assign(tax_due=pd.to_numeric(df["tax_due"], errors="coerce"))
+                .groupby("province", as_index=False)["tax_due"]
+                .mean()
+                .sort_values("tax_due")
+            )
+            fig_prov = px.bar(
+                by_province,
+                x="tax_due",
+                y="province",
+                orientation="h",
+                title="Avg Tax Due by Province",
+            )
+            fig_prov.update_traces(marker_line_width=0)
+            chart_col3.plotly_chart(style(fig_prov), use_container_width=True)
+
+        # --- Income distribution ---
+        if "income" in df.columns:
+            fig_income = px.histogram(
+                df.assign(income=pd.to_numeric(df["income"], errors="coerce")),
+                x="income",
+                nbins=20,
+                title="Income Distribution",
+            )
+            fig_income.update_traces(marker_line_width=0)
+            chart_col4.plotly_chart(style(fig_income), use_container_width=True)
+
+        # --- Tax due trend over submitted_date ---
+        if {"submitted_date", "tax_due"}.issubset(df.columns):
+            trend = df.copy()
+            trend["submitted_date"] = pd.to_datetime(
+                trend["submitted_date"], errors="coerce"
+            )
+            trend["tax_due"] = pd.to_numeric(trend["tax_due"], errors="coerce")
+            trend = trend.dropna(subset=["submitted_date"]).sort_values("submitted_date")
+            if not trend.empty:
+                fig_trend = go.Figure()
+                fig_trend.add_trace(
+                    go.Scatter(
+                        x=trend["submitted_date"],
+                        y=trend["tax_due"],
+                        mode="lines+markers",
+                        line=dict(color=ACCENTS[0], width=2),
+                        marker=dict(size=5, color=ACCENTS[0]),
+                    )
+                )
+                fig_trend.update_layout(title="Tax Due Over Submitted Date")
+                st.plotly_chart(style(fig_trend), use_container_width=True)
 
         st.subheader("Recent Events")
         sort_col = "submitted_date" if "submitted_date" in df.columns else "_received_at"
