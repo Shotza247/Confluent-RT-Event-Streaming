@@ -1,4 +1,5 @@
 from confluent_kafka import Producer, Consumer
+import sqlite3
 import json
 import random
 import time
@@ -179,7 +180,7 @@ def produce(topic, config):
 
     producer = Producer(config)
 
-    for _ in range(30):
+    for _ in range(50):
 
         application = generate_application()
 
