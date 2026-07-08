@@ -202,7 +202,7 @@ def produce(topic, config):
             f"Status={application['status']} "
         )
 
-        time.sleep(10)
+        time.sleep(2)
 
     producer.flush()
 
