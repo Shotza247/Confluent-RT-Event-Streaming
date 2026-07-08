@@ -213,62 +213,89 @@ def produce(topic, config):
 # ------------------------------------------------------
 
 def consume(topic, config):
-
     config["group.id"] = "tax_evaluation_group"
-
     config["auto.offset.reset"] = "earliest"
 
     consumer = Consumer(config)
-
     consumer.subscribe([topic])
 
+    conn = sqlite3.connect("applications.db")
+    cur = conn.cursor()
+
+    create_sql = """
+    CREATE TABLE IF NOT EXISTS applications (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      application_id TEXT,
+      customer_id TEXT,
+      customer_name TEXT,
+      email TEXT,
+      country TEXT,
+      province TEXT,
+      tax_year INTEGER,
+      income REAL,
+      tax_due REAL,
+      currency TEXT,
+      employment_type TEXT,
+      status TEXT,
+      submitted_date TEXT,
+      raw_json TEXT,
+      received_at TEXT
+    )
+    """
+    cur.execute(create_sql)
+    conn.commit()
+
+    insert_sql = """
+    INSERT INTO applications
+      (application_id, customer_id, customer_name, email, country, province, tax_year, income, tax_due, currency, employment_type, status, submitted_date, raw_json, received_at)
+    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+    """
+
     try:
-
         while True:
-
             msg = consumer.poll(1.0)
+            if msg is None:
+                continue
+            if msg.error():
+                print("Consumer error:", msg.error())
+                continue
 
-            if msg is not None and msg.error() is None:
+            raw = msg.value().decode("utf-8")
+            try:
+                value = json.loads(raw)
+            except Exception as e:
+                print("JSON decode error:", e)
+                value = {}
 
-                key = msg.key().decode("utf-8")
+            params = (
+                value.get("application_id"),
+                value.get("customer_id") or (msg.key().decode("utf-8") if msg.key() else None),
+                value.get("customer_name"),
+                value.get("email"),
+                value.get("country"),
+                value.get("province"),
+                value.get("tax_year"),
+                value.get("income"),
+                value.get("tax_due"),
+                value.get("currency"),
+                value.get("employment_type"),
+                value.get("status"),
+                value.get("submitted_date"),
+                raw,
+                datetime.utcnow().isoformat() + "Z"
+            )
 
-                value = json.loads(msg.value().decode("utf-8"))
-
-                print("\nConsumed Message")
-
-                print("------------------------------")
-
-                print(f"Customer ID     : {key}")
-
-                print(f"Application ID  : {value['application_id']}")
-
-                print(f"Customer Name   : {value['customer_name']}")
-
-                print(f"Email           : {value['email']}")
-
-                print(f"Country         : {value['country']}")
-
-                print(f"Tax Year        : {value['tax_year']}")
-
-                print(f"Income          : {value['income']}")
-
-                print(f"Tax Due         : {value['tax_due']}")
-
-                print(f"Currency        : {value['currency']}")
-
-                print(f"Employment Type : {value['employment_type']}")
-
-                print(f"Status          : {value['status']}")
-
-                print(f"Submitted Date  : {value['submitted_date']}")
+            try:
+                cur.execute(insert_sql, params)
+                conn.commit()
+            except Exception as e:
+                print("DB insert error:", e)
 
     except KeyboardInterrupt:
-
         pass
-
     finally:
-
         consumer.close()
+        conn.close()
 
 
 # ------------------------------------------------------
