@@ -16,6 +16,14 @@
         "documentation": {}
     },
     {
+        "label": "Consumer",
+        "importPath": "confluent_kafka",
+        "description": "confluent_kafka",
+        "isExtraImport": true,
+        "detail": "confluent_kafka",
+        "documentation": {}
+    },
+    {
         "label": "json",
         "kind": 6,
         "isExtraImport": true,
@@ -56,6 +64,24 @@
         "description": "datetime",
         "isExtraImport": true,
         "detail": "datetime",
+        "documentation": {}
+    },
+    {
+        "label": "streamlit",
+        "kind": 6,
+        "isExtraImport": true,
+        "importPath": "streamlit",
+        "description": "streamlit",
+        "detail": "streamlit",
+        "documentation": {}
+    },
+    {
+        "label": "pandas",
+        "kind": 6,
+        "isExtraImport": true,
+        "importPath": "pandas",
+        "description": "pandas",
+        "detail": "pandas",
         "documentation": {}
     },
     {
@@ -173,6 +199,96 @@
         "description": "client",
         "peekOfCode": "application_counter = 10001\n# ------------------------------------------------------\n# Helper Functions\n# ------------------------------------------------------\ndef random_date(year):\n    start = datetime(year, 1, 1)\n    end = datetime(year, 12, 31)\n    delta = end - start\n    random_days = random.randint(0, delta.days)\n    return (start + timedelta(days=random_days)).strftime(\"%Y-%m-%d\")",
         "detail": "client",
+        "documentation": {}
+    },
+    {
+        "label": "load_config",
+        "kind": 2,
+        "importPath": "dashboard",
+        "description": "dashboard",
+        "peekOfCode": "def load_config(path=CONFIG_PATH):\n    config = {}\n    with open(path) as fh:\n        for line in fh:\n            line = line.strip()\n            if len(line) != 0 and line[0] != \"#\":\n                k, v = line.split(\"=\", 1)\n                config[k.strip()] = v.strip()\n    return config\ndef create_consumer(conf):",
+        "detail": "dashboard",
+        "documentation": {}
+    },
+    {
+        "label": "create_consumer",
+        "kind": 2,
+        "importPath": "dashboard",
+        "description": "dashboard",
+        "peekOfCode": "def create_consumer(conf):\n    conf = conf.copy()\n    conf[\"group.id\"] = \"dashboard_consumer_group\"\n    conf[\"auto.offset.reset\"] = \"latest\"\n    return Consumer(conf)\nst.title(\"Tax Applications — Real-time KPI Dashboard\")\nst.sidebar.header(\"Settings\")\npoll_interval = st.sidebar.number_input(\"Poll interval (seconds)\", min_value=1, value=5)\nconfig = load_config()\nconsumer = create_consumer(config)",
+        "detail": "dashboard",
+        "documentation": {}
+    },
+    {
+        "label": "CONFIG_PATH",
+        "kind": 5,
+        "importPath": "dashboard",
+        "description": "dashboard",
+        "peekOfCode": "CONFIG_PATH = \"client.properties\"\nTOPIC = \"tax-evaluation-applications\"\n@st.cache_resource\ndef load_config(path=CONFIG_PATH):\n    config = {}\n    with open(path) as fh:\n        for line in fh:\n            line = line.strip()\n            if len(line) != 0 and line[0] != \"#\":\n                k, v = line.split(\"=\", 1)",
+        "detail": "dashboard",
+        "documentation": {}
+    },
+    {
+        "label": "TOPIC",
+        "kind": 5,
+        "importPath": "dashboard",
+        "description": "dashboard",
+        "peekOfCode": "TOPIC = \"tax-evaluation-applications\"\n@st.cache_resource\ndef load_config(path=CONFIG_PATH):\n    config = {}\n    with open(path) as fh:\n        for line in fh:\n            line = line.strip()\n            if len(line) != 0 and line[0] != \"#\":\n                k, v = line.split(\"=\", 1)\n                config[k.strip()] = v.strip()",
+        "detail": "dashboard",
+        "documentation": {}
+    },
+    {
+        "label": "poll_interval",
+        "kind": 5,
+        "importPath": "dashboard",
+        "description": "dashboard",
+        "peekOfCode": "poll_interval = st.sidebar.number_input(\"Poll interval (seconds)\", min_value=1, value=5)\nconfig = load_config()\nconsumer = create_consumer(config)\nconsumer.subscribe([TOPIC])\nst.sidebar.write(f\"Topic: {TOPIC}\")\n# In-memory rolling window\nwindow_limit = st.sidebar.number_input(\"Messages to retain\", min_value=10, value=200)\nif 'buffer' not in st.session_state:\n    st.session_state.buffer = []\nplaceholder_kpis = st.container()",
+        "detail": "dashboard",
+        "documentation": {}
+    },
+    {
+        "label": "config",
+        "kind": 5,
+        "importPath": "dashboard",
+        "description": "dashboard",
+        "peekOfCode": "config = load_config()\nconsumer = create_consumer(config)\nconsumer.subscribe([TOPIC])\nst.sidebar.write(f\"Topic: {TOPIC}\")\n# In-memory rolling window\nwindow_limit = st.sidebar.number_input(\"Messages to retain\", min_value=10, value=200)\nif 'buffer' not in st.session_state:\n    st.session_state.buffer = []\nplaceholder_kpis = st.container()\nplaceholder_table = st.container()",
+        "detail": "dashboard",
+        "documentation": {}
+    },
+    {
+        "label": "consumer",
+        "kind": 5,
+        "importPath": "dashboard",
+        "description": "dashboard",
+        "peekOfCode": "consumer = create_consumer(config)\nconsumer.subscribe([TOPIC])\nst.sidebar.write(f\"Topic: {TOPIC}\")\n# In-memory rolling window\nwindow_limit = st.sidebar.number_input(\"Messages to retain\", min_value=10, value=200)\nif 'buffer' not in st.session_state:\n    st.session_state.buffer = []\nplaceholder_kpis = st.container()\nplaceholder_table = st.container()\nwith st.sidebar:",
+        "detail": "dashboard",
+        "documentation": {}
+    },
+    {
+        "label": "window_limit",
+        "kind": 5,
+        "importPath": "dashboard",
+        "description": "dashboard",
+        "peekOfCode": "window_limit = st.sidebar.number_input(\"Messages to retain\", min_value=10, value=200)\nif 'buffer' not in st.session_state:\n    st.session_state.buffer = []\nplaceholder_kpis = st.container()\nplaceholder_table = st.container()\nwith st.sidebar:\n    st.write(\"Consumer group: dashboard_consumer_group\")\nst.write(\"Polling for new messages... Refresh the browser to reset state.\")\ntry:\n    msg = consumer.poll(timeout=1.0)",
+        "detail": "dashboard",
+        "documentation": {}
+    },
+    {
+        "label": "placeholder_kpis",
+        "kind": 5,
+        "importPath": "dashboard",
+        "description": "dashboard",
+        "peekOfCode": "placeholder_kpis = st.container()\nplaceholder_table = st.container()\nwith st.sidebar:\n    st.write(\"Consumer group: dashboard_consumer_group\")\nst.write(\"Polling for new messages... Refresh the browser to reset state.\")\ntry:\n    msg = consumer.poll(timeout=1.0)\n    if msg is None:\n        st.write(\"No new messages this poll.\")\n    elif msg.error():",
+        "detail": "dashboard",
+        "documentation": {}
+    },
+    {
+        "label": "placeholder_table",
+        "kind": 5,
+        "importPath": "dashboard",
+        "description": "dashboard",
+        "peekOfCode": "placeholder_table = st.container()\nwith st.sidebar:\n    st.write(\"Consumer group: dashboard_consumer_group\")\nst.write(\"Polling for new messages... Refresh the browser to reset state.\")\ntry:\n    msg = consumer.poll(timeout=1.0)\n    if msg is None:\n        st.write(\"No new messages this poll.\")\n    elif msg.error():\n        st.error(f\"Consumer error: {msg.error()}\")",
+        "detail": "dashboard",
         "documentation": {}
     }
 ]
