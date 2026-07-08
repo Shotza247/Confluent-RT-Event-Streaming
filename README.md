@@ -14,8 +14,9 @@ The instructions use `virtualenv` but you may use other virtual environment mana
 Create and activate a Python environment, so that you have an isolated workspace:
 
 ```shell
-virtualenv env
-source env/bin/activate
+Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass
+venv\Scripts\activate.ps1
+pip install -r requirements.txt
 ```
 
 Install the dependencies of this application:
@@ -45,3 +46,24 @@ found, please check if you are using a Python version for which a
 
 - For the Python client API, check out the [kafka-clients documentation](https://docs.confluent.io/platform/current/clients/confluent-kafka-python/html/index.html)
 - Check out the full [getting started tutorial](https://developer.confluent.io/get-started/python/)
+
+## Streamlit Dashboard
+
+A Streamlit dashboard is included to poll the `tax-evaluation-applications` topic and display simple KPIs (total events, average `tax_due`, status distribution, and recent events). The dashboard polls the topic and reads from the earliest offset by default.
+
+Install dependencies (if you haven't already):
+
+```shell
+pip install -r requirements.txt
+```
+
+Run the dashboard:
+
+```shell
+streamlit run dashboard.py
+```
+
+Notes:
+- The dashboard reads Kafka configuration from `client.properties`.
+- It uses a consumer with `auto.offset.reset=earliest` and `group.id=dashboard_consumer_group` by default.
+- Restart Streamlit to clear the in-memory buffer or change the consumer group to re-read offsets.
