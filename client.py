@@ -17,6 +17,9 @@ def read_config():
 
             if len(line) != 0 and line[0] != "#":
                 parameter, value = line.strip().split("=", 1)
+                # Skip schema.registry.* settings the dashboard to decode Avro from the Flink-derived topics.
+                if parameter.startswith("schema.registry."):
+                    continue
                 config[parameter] = value.strip()
 
     return config
