@@ -180,7 +180,7 @@ def produce(topic, config):
 
     producer = Producer(config)
 
-    for _ in range(50):
+    for _ in range(100):
 
         application = generate_application()
 
@@ -203,7 +203,7 @@ def produce(topic, config):
             f"Status={application['status']} "
         )
 
-        time.sleep(2)
+        time.sleep(5)
 
     producer.flush()
 

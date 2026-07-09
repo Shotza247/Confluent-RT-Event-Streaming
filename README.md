@@ -6,9 +6,11 @@ This project contains a Python 3 application that subscribes to a topic on a Con
 
 We assume that you already have Python 3 installed. The template was last tested against Python 3.12.5.
 
-The instructions use `virtualenv` but you may use other virtual environment managers like `venv` if you prefer.
+The instructions use `virtualenv` but you may use other virtual environment managers like `venv` if you prefer.  
 
-
+```shell 
+py -m venv venv   
+```
 ## Installation
 
 Create and activate a Python environment, so that you have an isolated workspace:
