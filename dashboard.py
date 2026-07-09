@@ -15,17 +15,17 @@ TOPIC = "tax-evaluation-applications"
 st.set_page_config(page_title="Tax Applications Dashboard", layout="wide")
 
 # ---- Minimal dark / warm-neutral palette for charts ----
-BG = "#111827"        # Deep slate background
-GRID = "#374151"      # Soft gray grid lines
-TEXT = "#F9FAFB"      # Crisp off-white text
+BG = "#0F172A"        # Midnight navy
+GRID = "#334155"      # Slate
+TEXT = "#F8FAFC"      # White
 
 ACCENTS = [
-    "#3B82F6",  # Blue
-    "#10B981",  # Emerald
-    "#F59E0B",  # Amber
-    "#EF4444",  # Coral Red
-    "#8B5CF6",  # Purple
-    "#06B6D4",  # Cyan
+    "#38BDF8",  # Sky Blue
+    "#22C55E",  # Green
+    "#F97316",  # Orange
+    "#A855F7",  # Violet
+    "#F43F5E",  # Rose
+    "#EAB308",  # Yellow
 ]
 
 CHART_LAYOUT = dict(
