@@ -46,10 +46,10 @@ EMPLOYMENT_TYPES = ["Full-Time", "Part-Time", "Self-Employed", "Contractor", "Re
 APPLICATION_STATUSES = ["Submitted", "Pending Review", "Under Audit", "Approved", "Rejected", "Processing", "Refund Issued", "Payment Outstanding"]
 
 TOPICS = {
-    "crm": "crm-customers",
-    "employment": "employment-income-records",
-    "tax": "tax-declaration-records",
-    "applications": "tax-application-events",
+    "crm": "crm_customers",
+    "employment": "employment_income_records",
+    "tax": "tax_declaration_records",
+    "applications": "tax_application_events",
 }
 # Reverse lookup: topic name -> friendly key, used by the consumer to route
 # each incoming message to the right SQLite table.

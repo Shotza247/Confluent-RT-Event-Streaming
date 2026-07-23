@@ -24,6 +24,31 @@
         "documentation": {}
     },
     {
+        "label": "AdminClient",
+        "importPath": "confluent_kafka.admin",
+        "description": "confluent_kafka.admin",
+        "isExtraImport": true,
+        "detail": "confluent_kafka.admin",
+        "documentation": {}
+    },
+    {
+        "label": "NewTopic",
+        "importPath": "confluent_kafka.admin",
+        "description": "confluent_kafka.admin",
+        "isExtraImport": true,
+        "detail": "confluent_kafka.admin",
+        "documentation": {}
+    },
+    {
+        "label": "sqlite3",
+        "kind": 6,
+        "isExtraImport": true,
+        "importPath": "sqlite3",
+        "description": "sqlite3",
+        "detail": "sqlite3",
+        "documentation": {}
+    },
+    {
         "label": "json",
         "kind": 6,
         "isExtraImport": true,
@@ -67,6 +92,22 @@
         "documentation": {}
     },
     {
+        "label": "timezone",
+        "importPath": "datetime",
+        "description": "datetime",
+        "isExtraImport": true,
+        "detail": "datetime",
+        "documentation": {}
+    },
+    {
+        "label": "datetime",
+        "importPath": "datetime",
+        "description": "datetime",
+        "isExtraImport": true,
+        "detail": "datetime",
+        "documentation": {}
+    },
+    {
         "label": "streamlit",
         "kind": 6,
         "isExtraImport": true,
@@ -85,11 +126,79 @@
         "documentation": {}
     },
     {
+        "label": "plotly.express",
+        "kind": 6,
+        "isExtraImport": true,
+        "importPath": "plotly.express",
+        "description": "plotly.express",
+        "detail": "plotly.express",
+        "documentation": {}
+    },
+    {
+        "label": "plotly.graph_objects",
+        "kind": 6,
+        "isExtraImport": true,
+        "importPath": "plotly.graph_objects",
+        "description": "plotly.graph_objects",
+        "detail": "plotly.graph_objects",
+        "documentation": {}
+    },
+    {
+        "label": "SchemaRegistryClient",
+        "importPath": "confluent_kafka.schema_registry",
+        "description": "confluent_kafka.schema_registry",
+        "isExtraImport": true,
+        "detail": "confluent_kafka.schema_registry",
+        "documentation": {}
+    },
+    {
+        "label": "AvroDeserializer",
+        "importPath": "confluent_kafka.schema_registry.avro",
+        "description": "confluent_kafka.schema_registry.avro",
+        "isExtraImport": true,
+        "detail": "confluent_kafka.schema_registry.avro",
+        "documentation": {}
+    },
+    {
+        "label": "SerializationContext",
+        "importPath": "confluent_kafka.serialization",
+        "description": "confluent_kafka.serialization",
+        "isExtraImport": true,
+        "detail": "confluent_kafka.serialization",
+        "documentation": {}
+    },
+    {
+        "label": "MessageField",
+        "importPath": "confluent_kafka.serialization",
+        "description": "confluent_kafka.serialization",
+        "isExtraImport": true,
+        "detail": "confluent_kafka.serialization",
+        "documentation": {}
+    },
+    {
         "label": "read_config",
         "kind": 2,
         "importPath": "client",
         "description": "client",
-        "peekOfCode": "def read_config():\n    config = {}\n    with open(\"client.properties\") as fh:\n        for line in fh:\n            line = line.strip()\n            if len(line) != 0 and line[0] != \"#\":\n                parameter, value = line.strip().split(\"=\", 1)\n                config[parameter] = value.strip()\n    return config\n# ------------------------------------------------------",
+        "peekOfCode": "def read_config(path=\"client.properties\"):\n    config = {}\n    with open(path) as fh:\n        for line in fh:\n            line = line.strip()\n            if len(line) != 0 and line[0] != \"#\":\n                parameter, value = line.split(\"=\", 1)\n                # Skip schema.registry.* settings — those are only used by\n                # the dashboard to decode Avro from Flink-derived topics.\n                # The plain Producer/Consumer here don't understand them.",
+        "detail": "client",
+        "documentation": {}
+    },
+    {
+        "label": "ensure_topics_exist",
+        "kind": 2,
+        "importPath": "client",
+        "description": "client",
+        "peekOfCode": "def ensure_topics_exist(config, topics, num_partitions=6, replication_factor=3):\n    admin_conf = {\n        k: v for k, v in config.items()\n        if k not in (\"group.id\", \"auto.offset.reset\")\n    }\n    admin_client = AdminClient(admin_conf)\n    existing = set(admin_client.list_topics(timeout=10).topics.keys())\n    missing = [t for t in topics if t not in existing]\n    if not missing:\n        print(\"All required topics already exist.\")",
+        "detail": "client",
+        "documentation": {}
+    },
+    {
+        "label": "now_utc",
+        "kind": 2,
+        "importPath": "client",
+        "description": "client",
+        "peekOfCode": "def now_utc():\n    return datetime.now(timezone.utc).isoformat().replace(\"+00:00\", \"Z\")\ndef random_date(year):\n    start = datetime(year, 1, 1)\n    end = datetime(year, 12, 31)\n    return (start + timedelta(days=random.randint(0, (end - start).days))).strftime(\"%Y-%m-%d\")\ndef produce_json(producer, topic, key, value):\n    producer.produce(topic, key=key, value=json.dumps(value))\n    producer.poll(0)\ndef generate_crm_customer(customer):",
         "detail": "client",
         "documentation": {}
     },
@@ -98,34 +207,79 @@
         "kind": 2,
         "importPath": "client",
         "description": "client",
-        "peekOfCode": "def random_date(year):\n    start = datetime(year, 1, 1)\n    end = datetime(year, 12, 31)\n    delta = end - start\n    random_days = random.randint(0, delta.days)\n    return (start + timedelta(days=random_days)).strftime(\"%Y-%m-%d\")\ndef generate_application():\n    global application_counter\n    customer = random.choice(customers)\n    customer_id = customer[\"customer_id\"]",
+        "peekOfCode": "def random_date(year):\n    start = datetime(year, 1, 1)\n    end = datetime(year, 12, 31)\n    return (start + timedelta(days=random.randint(0, (end - start).days))).strftime(\"%Y-%m-%d\")\ndef produce_json(producer, topic, key, value):\n    producer.produce(topic, key=key, value=json.dumps(value))\n    producer.poll(0)\ndef generate_crm_customer(customer):\n    return {\n        \"customer_id\": customer[\"customer_id\"],",
         "detail": "client",
         "documentation": {}
     },
     {
-        "label": "generate_application",
+        "label": "produce_json",
         "kind": 2,
         "importPath": "client",
         "description": "client",
-        "peekOfCode": "def generate_application():\n    global application_counter\n    customer = random.choice(customers)\n    customer_id = customer[\"customer_id\"]\n    name = customer[\"name\"]\n    first_name = name.split()[0].lower()\n    email = f\"{first_name}.{customer_id.lower()}@example.com\"\n    country = \"South Africa\"\n    province = random.choice(provinces)\n    tax_year = random.randint(2010, 2025)",
+        "peekOfCode": "def produce_json(producer, topic, key, value):\n    producer.produce(topic, key=key, value=json.dumps(value))\n    producer.poll(0)\ndef generate_crm_customer(customer):\n    return {\n        \"customer_id\": customer[\"customer_id\"],\n        \"customer_name\": customer[\"customer_name\"],\n        \"gender\": customer[\"gender\"],\n        \"email\": customer[\"email\"],\n        \"country\": \"South Africa\",",
         "detail": "client",
         "documentation": {}
     },
     {
-        "label": "produce",
+        "label": "generate_crm_customer",
         "kind": 2,
         "importPath": "client",
         "description": "client",
-        "peekOfCode": "def produce(topic, config):\n    producer = Producer(config)\n    for _ in range(30):\n        application = generate_application()\n        key = application[\"customer_id\"]\n        value = json.dumps(application)\n        producer.produce(\n            topic,\n            key=key,\n            value=value",
+        "peekOfCode": "def generate_crm_customer(customer):\n    return {\n        \"customer_id\": customer[\"customer_id\"],\n        \"customer_name\": customer[\"customer_name\"],\n        \"gender\": customer[\"gender\"],\n        \"email\": customer[\"email\"],\n        \"country\": \"South Africa\",\n        \"province\": customer[\"province\"],\n        \"crm_status\": random.choice([\"Active\", \"Active\", \"Active\", \"Dormant\"]),\n        \"customer_segment\": random.choice([\"Individual\", \"Small Business\", \"High Net Worth\"]),",
         "detail": "client",
         "documentation": {}
     },
     {
-        "label": "consume",
+        "label": "generate_employment_income",
         "kind": 2,
         "importPath": "client",
         "description": "client",
-        "peekOfCode": "def consume(topic, config):\n    config[\"group.id\"] = \"tax_evaluation_group\"\n    config[\"auto.offset.reset\"] = \"earliest\"\n    consumer = Consumer(config)\n    consumer.subscribe([topic])\n    try:\n        while True:\n            msg = consumer.poll(1.0)\n            if msg is not None and msg.error() is None:\n                key = msg.key().decode(\"utf-8\")",
+        "peekOfCode": "def generate_employment_income(customer_id, tax_year):\n    employment_type = random.choice(EMPLOYMENT_TYPES)\n    income = random.randint(20000, 100000)\n    return {\n        \"customer_id\": customer_id,\n        \"tax_year\": tax_year,\n        \"employment_type\": employment_type,\n        \"income\": income,\n        \"income_source\": random.choice([\"Payroll\", \"Self Declared\", \"Employer Submission\", \"Manual Capture\"]),\n        \"updated_at\": now_utc(),",
+        "detail": "client",
+        "documentation": {}
+    },
+    {
+        "label": "generate_tax_declaration",
+        "kind": 2,
+        "importPath": "client",
+        "description": "client",
+        "peekOfCode": "def generate_tax_declaration(customer_id, tax_year, income):\n    return {\n        \"customer_id\": customer_id,\n        \"tax_year\": tax_year,\n        \"tax_due\": round(income * random.uniform(0.15, 0.375), 2),\n        \"currency\": \"ZAR\",\n        \"declaration_channel\": random.choice([\"eFiling\", \"Branch\", \"Mobile App\", \"Call Centre\"]),\n        \"updated_at\": now_utc(),\n    }\ndef generate_application_event(customer_id, tax_year):",
+        "detail": "client",
+        "documentation": {}
+    },
+    {
+        "label": "generate_application_event",
+        "kind": 2,
+        "importPath": "client",
+        "description": "client",
+        "peekOfCode": "def generate_application_event(customer_id, tax_year):\n    global application_counter\n    application = {\n        \"application_id\": f\"APP-{application_counter}\",\n        \"customer_id\": customer_id,\n        \"tax_year\": tax_year,\n        \"status\": random.choice(APPLICATION_STATUSES),\n        \"submitted_date\": random_date(tax_year),\n        \"event_time\": now_utc(),\n    }",
+        "detail": "client",
+        "documentation": {}
+    },
+    {
+        "label": "produce_siloed_streams",
+        "kind": 2,
+        "importPath": "client",
+        "description": "client",
+        "peekOfCode": "def produce_siloed_streams(config, interval_seconds=2, total_events=100):\n    producer = Producer(config)\n    print(\"Producing CRM, employment, tax declaration, and application workflow events...\")\n    for _ in range(total_events):\n        customer = random.choice(CUSTOMERS)\n        customer_id = customer[\"customer_id\"]\n        tax_year = random.randint(2021, 2025)\n        crm_event = generate_crm_customer(customer)\n        employment_event = generate_employment_income(customer_id, tax_year)\n        tax_event = generate_tax_declaration(customer_id, tax_year, employment_event[\"income\"])",
+        "detail": "client",
+        "documentation": {}
+    },
+    {
+        "label": "params_for",
+        "kind": 2,
+        "importPath": "client",
+        "description": "client",
+        "peekOfCode": "def params_for(key, value, raw, received_at):\n    \"\"\"Build the INSERT params tuple for a given stream key, using\n    value.get(...) throughout so a missing/malformed field never crashes\n    the consumer — it just stores NULL for that column.\"\"\"\n    if key == \"crm\":\n        return (\n            value.get(\"customer_id\"), value.get(\"customer_name\"), value.get(\"gender\"),\n            value.get(\"email\"), value.get(\"country\"), value.get(\"province\"),\n            value.get(\"crm_status\"), value.get(\"customer_segment\"), value.get(\"updated_at\"),\n            raw, received_at,",
+        "detail": "client",
+        "documentation": {}
+    },
+    {
+        "label": "consume_siloed_streams",
+        "kind": 2,
+        "importPath": "client",
+        "description": "client",
+        "peekOfCode": "def consume_siloed_streams(config, group_id=\"siloed_ingestion_group\", db_path=\"applications.db\"):\n    conf = config.copy()\n    conf[\"group.id\"] = group_id\n    conf[\"auto.offset.reset\"] = \"earliest\"\n    consumer = Consumer(conf)\n    consumer.subscribe(list(TOPICS.values()))\n    conn = sqlite3.connect(db_path)\n    cur = conn.cursor()\n    for sql in CREATE_TABLE_SQL.values():\n        cur.execute(sql)",
         "detail": "client",
         "documentation": {}
     },
@@ -134,61 +288,52 @@
         "kind": 2,
         "importPath": "client",
         "description": "client",
-        "peekOfCode": "def main():\n    config = read_config()\n    topic = \"tax-evaluation-applications\"\n    produce(topic, config)\n    consume(topic, config)\nmain()",
+        "peekOfCode": "def main():\n    config = read_config()\n    ensure_topics_exist(config, list(TOPICS.values()))\n    produce_siloed_streams(config, interval_seconds=2, total_events=100)\n    consume_siloed_streams(config)\nif __name__ == \"__main__\":\n    main()",
         "detail": "client",
         "documentation": {}
     },
     {
-        "label": "customers",
+        "label": "CUSTOMERS",
         "kind": 5,
         "importPath": "client",
         "description": "client",
-        "peekOfCode": "customers = [\n    {\"customer_id\": \"CUST-1001\", \"name\": \"John Nkosi\"},\n    {\"customer_id\": \"CUST-1002\", \"name\": \"Sarah Johnson\"},\n    {\"customer_id\": \"CUST-1003\", \"name\": \"Lerato Eva Brown\"},\n    {\"customer_id\": \"CUST-1004\", \"name\": \"Emma Williams\"},\n    {\"customer_id\": \"CUST-1005\", \"name\": \"Daniel Van Jones\"},\n    {\"customer_id\": \"CUST-1006\", \"name\": \"Thabo Miller\"},\n    {\"customer_id\": \"CUST-1007\", \"name\": \"David Wilson\"},\n    {\"customer_id\": \"CUST-1008\", \"name\": \"Sophia Mvambo\"},\n    {\"customer_id\": \"CUST-1009\", \"name\": \"James Kutlwano Anderson\"},",
+        "peekOfCode": "CUSTOMERS = [\n    {\"customer_id\": \"CUST-1001\", \"customer_name\": \"John Nkosi\", \"gender\": \"Male\", \"email\": \"john.cust-1001@example.com\", \"province\": \"Gauteng\"},\n    {\"customer_id\": \"CUST-1002\", \"customer_name\": \"Sarah Johnson\", \"gender\": \"Female\", \"email\": \"sarah.cust-1002@example.com\", \"province\": \"Western Cape\"},\n    {\"customer_id\": \"CUST-1003\", \"customer_name\": \"Lerato Eva Brown\", \"gender\": \"Female\", \"email\": \"lerato.cust-1003@example.com\", \"province\": \"KwaZulu-Natal\"},\n    {\"customer_id\": \"CUST-1004\", \"customer_name\": \"Emma Williams\", \"gender\": \"Female\", \"email\": \"emma.cust-1004@example.com\", \"province\": \"Eastern Cape\"},\n    {\"customer_id\": \"CUST-1005\", \"customer_name\": \"Daniel Van Jones\", \"gender\": \"Male\", \"email\": \"daniel.cust-1005@example.com\", \"province\": \"Free State\"},\n    {\"customer_id\": \"CUST-1006\", \"customer_name\": \"Thabo Miller\", \"gender\": \"Male\", \"email\": \"thabo.cust-1006@example.com\", \"province\": \"Mpumalanga\"},\n    {\"customer_id\": \"CUST-1007\", \"customer_name\": \"David Wilson\", \"gender\": \"Male\", \"email\": \"david.cust-1007@example.com\", \"province\": \"Limpopo\"},\n    {\"customer_id\": \"CUST-1008\", \"customer_name\": \"Sophia Mvambo\", \"gender\": \"Female\", \"email\": \"sophia.cust-1008@example.com\", \"province\": \"Northern Cape\"},\n    {\"customer_id\": \"CUST-1010\", \"customer_name\": \"Emily Mabatho Thomas\", \"gender\": \"Female\", \"email\": \"emily.cust-1010@example.com\", \"province\": \"Gauteng\"},",
         "detail": "client",
         "documentation": {}
     },
     {
-        "label": "\"\"\"countries",
+        "label": "EMPLOYMENT_TYPES",
         "kind": 5,
         "importPath": "client",
         "description": "client",
-        "peekOfCode": "\"\"\"countries = [\n    \"South Africa\",\n    \"United Kingdom\",\n    \"United States\",\n    \"Canada\",\n    \"Australia\",\n    \"Germany\",\n    \"France\",\n    \"India\",\n    \"Brazil\",",
+        "peekOfCode": "EMPLOYMENT_TYPES = [\"Full-Time\", \"Part-Time\", \"Self-Employed\", \"Contractor\", \"Retired\"]\nAPPLICATION_STATUSES = [\"Submitted\", \"Pending Review\", \"Under Audit\", \"Approved\", \"Rejected\", \"Processing\", \"Refund Issued\", \"Payment Outstanding\"]\nTOPICS = {\n    \"crm\": \"crm_customers\",\n    \"employment\": \"employment_income_records\",\n    \"tax\": \"tax_declaration_records\",\n    \"applications\": \"tax_application_events\",\n}\n# Reverse lookup: topic name -> friendly key, used by the consumer to route\n# each incoming message to the right SQLite table.",
         "detail": "client",
         "documentation": {}
     },
     {
-        "label": "provinces",
+        "label": "APPLICATION_STATUSES",
         "kind": 5,
         "importPath": "client",
         "description": "client",
-        "peekOfCode": "provinces = [\n    \"Gauteng\",\n    \"Free State\",\n    \"KwaZulu-Natal\",\n    \"Mpumalanga\",\n    \"Western Cape\",\n    \"Eastern Cape\",\n    \"Limpopo\",\n    \"North West\",\n    \"Northern Cape\"",
+        "peekOfCode": "APPLICATION_STATUSES = [\"Submitted\", \"Pending Review\", \"Under Audit\", \"Approved\", \"Rejected\", \"Processing\", \"Refund Issued\", \"Payment Outstanding\"]\nTOPICS = {\n    \"crm\": \"crm_customers\",\n    \"employment\": \"employment_income_records\",\n    \"tax\": \"tax_declaration_records\",\n    \"applications\": \"tax_application_events\",\n}\n# Reverse lookup: topic name -> friendly key, used by the consumer to route\n# each incoming message to the right SQLite table.\nTOPIC_TO_KEY = {v: k for k, v in TOPICS.items()}",
         "detail": "client",
         "documentation": {}
     },
     {
-        "label": "statuses",
+        "label": "TOPICS",
         "kind": 5,
         "importPath": "client",
         "description": "client",
-        "peekOfCode": "statuses = [\n    \"Submitted\",\n    \"Pending Review\",\n    \"Under Audit\",\n    \"Approved\",\n    \"Rejected\",\n    \"Processing\",\n    \"Refund Issued\",\n    \"Payment Outstanding\"\n]",
+        "peekOfCode": "TOPICS = {\n    \"crm\": \"crm_customers\",\n    \"employment\": \"employment_income_records\",\n    \"tax\": \"tax_declaration_records\",\n    \"applications\": \"tax_application_events\",\n}\n# Reverse lookup: topic name -> friendly key, used by the consumer to route\n# each incoming message to the right SQLite table.\nTOPIC_TO_KEY = {v: k for k, v in TOPICS.items()}\napplication_counter = 10001",
         "detail": "client",
         "documentation": {}
     },
     {
-        "label": "employment_types",
+        "label": "TOPIC_TO_KEY",
         "kind": 5,
         "importPath": "client",
         "description": "client",
-        "peekOfCode": "employment_types = [\n    \"Full-Time\",\n    \"Part-Time\",\n    \"Self-Employed\",\n    \"Contractor\",\n    \"Retired\"\n]\n#currencies = [\"ZAR\"]\napplication_counter = 10001\n# ------------------------------------------------------",
-        "detail": "client",
-        "documentation": {}
-    },
-    {
-        "label": "#currencies",
-        "kind": 5,
-        "importPath": "client",
-        "description": "client",
-        "peekOfCode": "#currencies = [\"ZAR\"]\napplication_counter = 10001\n# ------------------------------------------------------\n# Helper Functions\n# ------------------------------------------------------\ndef random_date(year):\n    start = datetime(year, 1, 1)\n    end = datetime(year, 12, 31)\n    delta = end - start\n    random_days = random.randint(0, delta.days)",
+        "peekOfCode": "TOPIC_TO_KEY = {v: k for k, v in TOPICS.items()}\napplication_counter = 10001\n# ------------------------------------------------------\n# Topic setup — Confluent Cloud does NOT auto-create topics on produce,\n# so ensure they exist before we try to write to them. Idempotent: safe\n# to call on every run.\n# ------------------------------------------------------\ndef ensure_topics_exist(config, topics, num_partitions=6, replication_factor=3):\n    admin_conf = {\n        k: v for k, v in config.items()",
         "detail": "client",
         "documentation": {}
     },
@@ -197,8 +342,35 @@
         "kind": 5,
         "importPath": "client",
         "description": "client",
-        "peekOfCode": "application_counter = 10001\n# ------------------------------------------------------\n# Helper Functions\n# ------------------------------------------------------\ndef random_date(year):\n    start = datetime(year, 1, 1)\n    end = datetime(year, 12, 31)\n    delta = end - start\n    random_days = random.randint(0, delta.days)\n    return (start + timedelta(days=random_days)).strftime(\"%Y-%m-%d\")",
+        "peekOfCode": "application_counter = 10001\n# ------------------------------------------------------\n# Topic setup — Confluent Cloud does NOT auto-create topics on produce,\n# so ensure they exist before we try to write to them. Idempotent: safe\n# to call on every run.\n# ------------------------------------------------------\ndef ensure_topics_exist(config, topics, num_partitions=6, replication_factor=3):\n    admin_conf = {\n        k: v for k, v in config.items()\n        if k not in (\"group.id\", \"auto.offset.reset\")",
         "detail": "client",
+        "documentation": {}
+    },
+    {
+        "label": "CREATE_TABLE_SQL",
+        "kind": 5,
+        "importPath": "client",
+        "description": "client",
+        "peekOfCode": "CREATE_TABLE_SQL = {\n    \"crm\": \"\"\"\n        CREATE TABLE IF NOT EXISTS crm_customers (\n          id INTEGER PRIMARY KEY AUTOINCREMENT,\n          customer_id TEXT,\n          customer_name TEXT,\n          gender TEXT,\n          email TEXT,\n          country TEXT,\n          province TEXT,",
+        "detail": "client",
+        "documentation": {}
+    },
+    {
+        "label": "INSERT_SQL",
+        "kind": 5,
+        "importPath": "client",
+        "description": "client",
+        "peekOfCode": "INSERT_SQL = {\n    \"crm\": \"\"\"\n        INSERT INTO crm_customers\n          (customer_id, customer_name, gender, email, country, province, crm_status, customer_segment, updated_at, raw_json, received_at)\n        VALUES (?,?,?,?,?,?,?,?,?,?,?)\n    \"\"\",\n    \"employment\": \"\"\"\n        INSERT INTO employment_income_records\n          (customer_id, tax_year, employment_type, income, income_source, updated_at, raw_json, received_at)\n        VALUES (?,?,?,?,?,?,?,?)",
+        "detail": "client",
+        "documentation": {}
+    },
+    {
+        "label": "style",
+        "kind": 2,
+        "importPath": "dashboard",
+        "description": "dashboard",
+        "peekOfCode": "def style(fig):\n    fig.update_layout(**CHART_LAYOUT)\n    return fig\n@st.cache_resource\ndef load_config(path=CONFIG_PATH):\n    \"\"\"Load Kafka (+ Schema Registry, if present) client config.\n    Priority:\n    1. Streamlit secrets (st.secrets[\"kafka\"]) — used on Streamlit Community\n       Cloud, where client.properties is never committed to the repo.\n    2. Local client.properties file — used for local development.",
+        "detail": "dashboard",
         "documentation": {}
     },
     {
@@ -206,16 +378,70 @@
         "kind": 2,
         "importPath": "dashboard",
         "description": "dashboard",
-        "peekOfCode": "def load_config(path=CONFIG_PATH):\n    config = {}\n    with open(path) as fh:\n        for line in fh:\n            line = line.strip()\n            if len(line) != 0 and line[0] != \"#\":\n                k, v = line.split(\"=\", 1)\n                config[k.strip()] = v.strip()\n    return config\ndef create_consumer(conf):",
+        "peekOfCode": "def load_config(path=CONFIG_PATH):\n    \"\"\"Load Kafka (+ Schema Registry, if present) client config.\n    Priority:\n    1. Streamlit secrets (st.secrets[\"kafka\"]) — used on Streamlit Community\n       Cloud, where client.properties is never committed to the repo.\n    2. Local client.properties file — used for local development.\n    Schema Registry settings, if you add them, should use the\n    \"schema.registry.\" prefix, e.g.:\n        schema.registry.url=https://psrc-xxxxx.region.aws.confluent.cloud\n        schema.registry.basic.auth.user.info=SR_API_KEY:SR_API_SECRET",
         "detail": "dashboard",
         "documentation": {}
     },
     {
-        "label": "create_consumer",
+        "label": "split_kafka_and_schema_registry_config",
         "kind": 2,
         "importPath": "dashboard",
         "description": "dashboard",
-        "peekOfCode": "def create_consumer(conf):\n    conf = conf.copy()\n    conf[\"group.id\"] = \"dashboard_consumer_group\"\n    conf[\"auto.offset.reset\"] = \"latest\"\n    return Consumer(conf)\nst.title(\"Tax Applications — Real-time KPI Dashboard\")\nst.sidebar.header(\"Settings\")\npoll_interval = st.sidebar.number_input(\"Poll interval (seconds)\", min_value=1, value=5)\nconfig = load_config()\nconsumer = create_consumer(config)",
+        "peekOfCode": "def split_kafka_and_schema_registry_config(config):\n    \"\"\"Separate plain Kafka client config from schema.registry.* config.\"\"\"\n    kafka_conf = {}\n    sr_conf = {}\n    for k, v in config.items():\n        if k.startswith(\"schema.registry.\"):\n            sr_conf[k[len(\"schema.registry.\"):]] = v\n        else:\n            kafka_conf[k] = v\n    return kafka_conf, sr_conf",
+        "detail": "dashboard",
+        "documentation": {}
+    },
+    {
+        "label": "get_consumer",
+        "kind": 2,
+        "importPath": "dashboard",
+        "description": "dashboard",
+        "peekOfCode": "def get_consumer(_kafka_conf, group_id, topics):\n    \"\"\"Create ONE Kafka consumer subscribed to ALL topics, cached across\n    Streamlit reruns. Messages are routed to the right buffer using\n    msg.topic() in the poll loop below.\n    Without @st.cache_resource, a brand new consumer (with the same\n    group.id) would be created on every rerun, repeatedly triggering a\n    consumer-group rebalance.\n    \"\"\"\n    conf = _kafka_conf.copy()\n    conf[\"group.id\"] = group_id",
+        "detail": "dashboard",
+        "documentation": {}
+    },
+    {
+        "label": "get_avro_deserializer",
+        "kind": 2,
+        "importPath": "dashboard",
+        "description": "dashboard",
+        "peekOfCode": "def get_avro_deserializer(_sr_conf):\n    \"\"\"Build a schema-registry-aware Avro deserializer, if SR config is\n    present. Returns None if no schema.registry.* settings were provided —\n    in that case Avro topics will show a clear warning instead of silently\n    failing.\n    Passing schema_str=None to AvroDeserializer means it looks up the\n    correct writer schema per-message from the registry (using the schema\n    ID embedded in the Confluent wire format), so ONE deserializer works\n    across all your Flink topics even though they have different schemas.\n    \"\"\"",
+        "detail": "dashboard",
+        "documentation": {}
+    },
+    {
+        "label": "safe_deserialize",
+        "kind": 2,
+        "importPath": "dashboard",
+        "description": "dashboard",
+        "peekOfCode": "def safe_deserialize(msg, avro_deserializer):\n    \"\"\"Try JSON first, then Avro (if a schema registry is configured).\n    Returns (value_dict, key, error_str).\"\"\"\n    try:\n        key = msg.key().decode(\"utf-8\") if msg.key() else None\n    except UnicodeDecodeError:\n        key = None\n    raw_value = msg.value()\n    # Attempt 1: plain JSON (works for your raw producer topic, and any\n    # Flink topic explicitly created with 'value.format' = 'json-registry')",
+        "detail": "dashboard",
+        "documentation": {}
+    },
+    {
+        "label": "live_dashboard",
+        "kind": 2,
+        "importPath": "dashboard",
+        "description": "dashboard",
+        "peekOfCode": "def live_dashboard():\n    new_counts = {t: 0 for t in ALL_TOPICS}\n    for _ in range(int(poll_batch_size)):\n        msg = consumer.poll(timeout=0.2)\n        if msg is None:\n            break\n        if msg.error():\n            continue\n        topic = msg.topic()\n        value, key, err = safe_deserialize(msg, avro_deserializer)",
+        "detail": "dashboard",
+        "documentation": {}
+    },
+    {
+        "label": "render_raw_feed",
+        "kind": 2,
+        "importPath": "dashboard",
+        "description": "dashboard",
+        "peekOfCode": "def render_raw_feed(df):\n    \"\"\"Rich, hand-tuned view for the raw producer topic.\"\"\"\n    total = len(df)\n    avg_tax = pd.to_numeric(df.get(\"tax_due\"), errors=\"coerce\").mean()\n    avg_income = pd.to_numeric(df.get(\"income\"), errors=\"coerce\").mean()\n    col1, col2, col3, col4 = st.columns(4)\n    col1.metric(\"Total events\", total)\n    col2.metric(\"Avg tax_due\", f\"{avg_tax:,.2f}\" if pd.notna(avg_tax) else \"—\")\n    col3.metric(\"Avg income\", f\"{avg_income:,.2f}\" if pd.notna(avg_income) else \"—\")\n    col4.metric(",
+        "detail": "dashboard",
+        "documentation": {}
+    },
+    {
+        "label": "render_flink_topic",
+        "kind": 2,
+        "importPath": "dashboard",
+        "description": "dashboard",
+        "peekOfCode": "def render_flink_topic(df, label):\n    \"\"\"Generic view for Flink-derived topics, whose exact schema we haven't\n    confirmed yet. Shows KPIs + an auto-detected chart, plus the raw\n    records so you can sanity-check the actual fields against what I've\n    assumed. Once you confirm the real field names, tell me and I'll\n    tailor a proper view per topic.\"\"\"\n    total = len(df)\n    st.metric(\"Total records\", total)\n    numeric_cols = [\n        c for c in df.columns",
         "detail": "dashboard",
         "documentation": {}
     },
@@ -224,43 +450,97 @@
         "kind": 5,
         "importPath": "dashboard",
         "description": "dashboard",
-        "peekOfCode": "CONFIG_PATH = \"client.properties\"\nTOPIC = \"tax-evaluation-applications\"\n@st.cache_resource\ndef load_config(path=CONFIG_PATH):\n    config = {}\n    with open(path) as fh:\n        for line in fh:\n            line = line.strip()\n            if len(line) != 0 and line[0] != \"#\":\n                k, v = line.split(\"=\", 1)",
+        "peekOfCode": "CONFIG_PATH = \"client.properties\"\n# ---- Topics ----\nRAW_TOPIC = \"tax-evaluation-applications\"\n# Flink-derived topics, from your Confluent Cloud Stream Lineage graph.\n#\n# VERIFY THESE: two names were truncated in the screenshot you shared —\n# \"high_income_applicatio...\" and \"employment_summary_...\". I've guessed\n# high_income_applications and employment_summary_table (matching the\n# _table naming pattern used by tax_year_summary_table /\n# regional_summary_table). If either is wrong, that tab will just silently",
         "detail": "dashboard",
         "documentation": {}
     },
     {
-        "label": "TOPIC",
+        "label": "RAW_TOPIC",
         "kind": 5,
         "importPath": "dashboard",
         "description": "dashboard",
-        "peekOfCode": "TOPIC = \"tax-evaluation-applications\"\n@st.cache_resource\ndef load_config(path=CONFIG_PATH):\n    config = {}\n    with open(path) as fh:\n        for line in fh:\n            line = line.strip()\n            if len(line) != 0 and line[0] != \"#\":\n                k, v = line.split(\"=\", 1)\n                config[k.strip()] = v.strip()",
+        "peekOfCode": "RAW_TOPIC = \"tax-evaluation-applications\"\n# Flink-derived topics, from your Confluent Cloud Stream Lineage graph.\n#\n# VERIFY THESE: two names were truncated in the screenshot you shared —\n# \"high_income_applicatio...\" and \"employment_summary_...\". I've guessed\n# high_income_applications and employment_summary_table (matching the\n# _table naming pattern used by tax_year_summary_table /\n# regional_summary_table). If either is wrong, that tab will just silently\n# show \"no data yet\" forever — Kafka doesn't error on subscribing to a\n# topic name that doesn't match, it just never receives anything for it.",
         "detail": "dashboard",
         "documentation": {}
     },
     {
-        "label": "poll_interval",
+        "label": "FLINK_TOPICS",
         "kind": 5,
         "importPath": "dashboard",
         "description": "dashboard",
-        "peekOfCode": "poll_interval = st.sidebar.number_input(\"Poll interval (seconds)\", min_value=1, value=5)\nconfig = load_config()\nconsumer = create_consumer(config)\nconsumer.subscribe([TOPIC])\nst.sidebar.write(f\"Topic: {TOPIC}\")\n# In-memory rolling window\nwindow_limit = st.sidebar.number_input(\"Messages to retain\", min_value=10, value=200)\nif 'buffer' not in st.session_state:\n    st.session_state.buffer = []\nplaceholder_kpis = st.container()",
+        "peekOfCode": "FLINK_TOPICS = {\n    \"High Income Applications\": \"high_income_applications\",\n    \"Status Summary\": \"status_summary\",\n    \"Tax Year Summary\": \"tax_year_summary_table\",\n    \"Regional Summary\": \"regional_summary_table\",\n    \"Province Tax Revenue\": \"province_tax_revenue\",\n    \"Income by Employment\": \"income_by_employment\",\n    \"High Tax Due\": \"high_tax_due\",\n    \"Employment Summary\": \"employment_summary_table\",  # <-- verify exact name\n}",
         "detail": "dashboard",
         "documentation": {}
     },
     {
-        "label": "config",
+        "label": "ALL_TOPICS",
         "kind": 5,
         "importPath": "dashboard",
         "description": "dashboard",
-        "peekOfCode": "config = load_config()\nconsumer = create_consumer(config)\nconsumer.subscribe([TOPIC])\nst.sidebar.write(f\"Topic: {TOPIC}\")\n# In-memory rolling window\nwindow_limit = st.sidebar.number_input(\"Messages to retain\", min_value=10, value=200)\nif 'buffer' not in st.session_state:\n    st.session_state.buffer = []\nplaceholder_kpis = st.container()\nplaceholder_table = st.container()",
+        "peekOfCode": "ALL_TOPICS = [RAW_TOPIC] + list(FLINK_TOPICS.values())\nst.set_page_config(page_title=\"Tax Applications Dashboard\", layout=\"wide\")\n# ---- Palette ----\nBG = \"#0F172A\"\nGRID = \"#334155\"\nTEXT = \"#F8FAFC\"\nACCENTS = [\"#38BDF8\", \"#22C55E\", \"#F97316\", \"#A855F7\", \"#F43F5E\", \"#EAB308\"]\nCHART_LAYOUT = dict(\n    paper_bgcolor=BG,\n    plot_bgcolor=BG,",
         "detail": "dashboard",
         "documentation": {}
     },
     {
-        "label": "consumer",
+        "label": "BG",
         "kind": 5,
         "importPath": "dashboard",
         "description": "dashboard",
-        "peekOfCode": "consumer = create_consumer(config)\nconsumer.subscribe([TOPIC])\nst.sidebar.write(f\"Topic: {TOPIC}\")\n# In-memory rolling window\nwindow_limit = st.sidebar.number_input(\"Messages to retain\", min_value=10, value=200)\nif 'buffer' not in st.session_state:\n    st.session_state.buffer = []\nplaceholder_kpis = st.container()\nplaceholder_table = st.container()\nwith st.sidebar:",
+        "peekOfCode": "BG = \"#0F172A\"\nGRID = \"#334155\"\nTEXT = \"#F8FAFC\"\nACCENTS = [\"#38BDF8\", \"#22C55E\", \"#F97316\", \"#A855F7\", \"#F43F5E\", \"#EAB308\"]\nCHART_LAYOUT = dict(\n    paper_bgcolor=BG,\n    plot_bgcolor=BG,\n    font=dict(color=TEXT, family=\"Inter, sans-serif\"),\n    margin=dict(l=30, r=20, t=40, b=30),\n    xaxis=dict(gridcolor=GRID, zerolinecolor=GRID),",
+        "detail": "dashboard",
+        "documentation": {}
+    },
+    {
+        "label": "GRID",
+        "kind": 5,
+        "importPath": "dashboard",
+        "description": "dashboard",
+        "peekOfCode": "GRID = \"#334155\"\nTEXT = \"#F8FAFC\"\nACCENTS = [\"#38BDF8\", \"#22C55E\", \"#F97316\", \"#A855F7\", \"#F43F5E\", \"#EAB308\"]\nCHART_LAYOUT = dict(\n    paper_bgcolor=BG,\n    plot_bgcolor=BG,\n    font=dict(color=TEXT, family=\"Inter, sans-serif\"),\n    margin=dict(l=30, r=20, t=40, b=30),\n    xaxis=dict(gridcolor=GRID, zerolinecolor=GRID),\n    yaxis=dict(gridcolor=GRID, zerolinecolor=GRID),",
+        "detail": "dashboard",
+        "documentation": {}
+    },
+    {
+        "label": "TEXT",
+        "kind": 5,
+        "importPath": "dashboard",
+        "description": "dashboard",
+        "peekOfCode": "TEXT = \"#F8FAFC\"\nACCENTS = [\"#38BDF8\", \"#22C55E\", \"#F97316\", \"#A855F7\", \"#F43F5E\", \"#EAB308\"]\nCHART_LAYOUT = dict(\n    paper_bgcolor=BG,\n    plot_bgcolor=BG,\n    font=dict(color=TEXT, family=\"Inter, sans-serif\"),\n    margin=dict(l=30, r=20, t=40, b=30),\n    xaxis=dict(gridcolor=GRID, zerolinecolor=GRID),\n    yaxis=dict(gridcolor=GRID, zerolinecolor=GRID),\n    colorway=ACCENTS,",
+        "detail": "dashboard",
+        "documentation": {}
+    },
+    {
+        "label": "ACCENTS",
+        "kind": 5,
+        "importPath": "dashboard",
+        "description": "dashboard",
+        "peekOfCode": "ACCENTS = [\"#38BDF8\", \"#22C55E\", \"#F97316\", \"#A855F7\", \"#F43F5E\", \"#EAB308\"]\nCHART_LAYOUT = dict(\n    paper_bgcolor=BG,\n    plot_bgcolor=BG,\n    font=dict(color=TEXT, family=\"Inter, sans-serif\"),\n    margin=dict(l=30, r=20, t=40, b=30),\n    xaxis=dict(gridcolor=GRID, zerolinecolor=GRID),\n    yaxis=dict(gridcolor=GRID, zerolinecolor=GRID),\n    colorway=ACCENTS,\n)",
+        "detail": "dashboard",
+        "documentation": {}
+    },
+    {
+        "label": "CHART_LAYOUT",
+        "kind": 5,
+        "importPath": "dashboard",
+        "description": "dashboard",
+        "peekOfCode": "CHART_LAYOUT = dict(\n    paper_bgcolor=BG,\n    plot_bgcolor=BG,\n    font=dict(color=TEXT, family=\"Inter, sans-serif\"),\n    margin=dict(l=30, r=20, t=40, b=30),\n    xaxis=dict(gridcolor=GRID, zerolinecolor=GRID),\n    yaxis=dict(gridcolor=GRID, zerolinecolor=GRID),\n    colorway=ACCENTS,\n)\ndef style(fig):",
+        "detail": "dashboard",
+        "documentation": {}
+    },
+    {
+        "label": "refresh_seconds",
+        "kind": 5,
+        "importPath": "dashboard",
+        "description": "dashboard",
+        "peekOfCode": "refresh_seconds = st.sidebar.number_input(\n    \"Auto-refresh interval (seconds)\", min_value=1, value=3\n)\npoll_batch_size = st.sidebar.number_input(\n    \"Max messages to drain per refresh\", min_value=1, value=50\n)\nwindow_limit = st.sidebar.number_input(\n    \"Messages to retain per topic\", min_value=10, value=200\n)\n# --- Consumer group handling ---",
+        "detail": "dashboard",
+        "documentation": {}
+    },
+    {
+        "label": "poll_batch_size",
+        "kind": 5,
+        "importPath": "dashboard",
+        "description": "dashboard",
+        "peekOfCode": "poll_batch_size = st.sidebar.number_input(\n    \"Max messages to drain per refresh\", min_value=1, value=50\n)\nwindow_limit = st.sidebar.number_input(\n    \"Messages to retain per topic\", min_value=10, value=200\n)\n# --- Consumer group handling ---\n# A stable group id RESUMES from wherever it last left off (including\n# \"already at the end, nothing new to read\" if a prior run drained\n# everything). A fresh group id always starts from the earliest offset on",
         "detail": "dashboard",
         "documentation": {}
     },
@@ -269,25 +549,43 @@
         "kind": 5,
         "importPath": "dashboard",
         "description": "dashboard",
-        "peekOfCode": "window_limit = st.sidebar.number_input(\"Messages to retain\", min_value=10, value=200)\nif 'buffer' not in st.session_state:\n    st.session_state.buffer = []\nplaceholder_kpis = st.container()\nplaceholder_table = st.container()\nwith st.sidebar:\n    st.write(\"Consumer group: dashboard_consumer_group\")\nst.write(\"Polling for new messages... Refresh the browser to reset state.\")\ntry:\n    msg = consumer.poll(timeout=1.0)",
+        "peekOfCode": "window_limit = st.sidebar.number_input(\n    \"Messages to retain per topic\", min_value=10, value=200\n)\n# --- Consumer group handling ---\n# A stable group id RESUMES from wherever it last left off (including\n# \"already at the end, nothing new to read\" if a prior run drained\n# everything). A fresh group id always starts from the earliest offset on\n# every topic. Default to fresh so \"no data showing up\" isn't silently\n# caused by a stale group — flip this off once you deliberately want to\n# resume a specific group's progress.",
         "detail": "dashboard",
         "documentation": {}
     },
     {
-        "label": "placeholder_kpis",
+        "label": "use_fresh_group",
         "kind": 5,
         "importPath": "dashboard",
         "description": "dashboard",
-        "peekOfCode": "placeholder_kpis = st.container()\nplaceholder_table = st.container()\nwith st.sidebar:\n    st.write(\"Consumer group: dashboard_consumer_group\")\nst.write(\"Polling for new messages... Refresh the browser to reset state.\")\ntry:\n    msg = consumer.poll(timeout=1.0)\n    if msg is None:\n        st.write(\"No new messages this poll.\")\n    elif msg.error():",
+        "peekOfCode": "use_fresh_group = st.sidebar.checkbox(\n    \"Use a fresh consumer group (recommended — re-reads all topics from \"\n    \"the earliest offset)\",\n    value=True,\n)\nif \"fresh_group_suffix\" not in st.session_state:\n    st.session_state.fresh_group_suffix = str(int(time.time()))\nif use_fresh_group:\n    group_id = f\"dashboard_consumer_group_{st.session_state.fresh_group_suffix}\"\nelse:",
         "detail": "dashboard",
         "documentation": {}
     },
     {
-        "label": "placeholder_table",
+        "label": "config",
         "kind": 5,
         "importPath": "dashboard",
         "description": "dashboard",
-        "peekOfCode": "placeholder_table = st.container()\nwith st.sidebar:\n    st.write(\"Consumer group: dashboard_consumer_group\")\nst.write(\"Polling for new messages... Refresh the browser to reset state.\")\ntry:\n    msg = consumer.poll(timeout=1.0)\n    if msg is None:\n        st.write(\"No new messages this poll.\")\n    elif msg.error():\n        st.error(f\"Consumer error: {msg.error()}\")",
+        "peekOfCode": "config = load_config()\nkafka_conf, sr_conf = split_kafka_and_schema_registry_config(config)\nconsumer = get_consumer(kafka_conf, group_id, ALL_TOPICS)\navro_deserializer = get_avro_deserializer(sr_conf)\nst.sidebar.write(f\"Active group id: `{group_id}`\")\nif avro_deserializer is None:\n    st.sidebar.caption(\n        \"⚠️ No Schema Registry configured — Avro topics will show a decode \"\n        \"warning instead of data.\"\n    )",
+        "detail": "dashboard",
+        "documentation": {}
+    },
+    {
+        "label": "consumer",
+        "kind": 5,
+        "importPath": "dashboard",
+        "description": "dashboard",
+        "peekOfCode": "consumer = get_consumer(kafka_conf, group_id, ALL_TOPICS)\navro_deserializer = get_avro_deserializer(sr_conf)\nst.sidebar.write(f\"Active group id: `{group_id}`\")\nif avro_deserializer is None:\n    st.sidebar.caption(\n        \"⚠️ No Schema Registry configured — Avro topics will show a decode \"\n        \"warning instead of data.\"\n    )\nelse:\n    st.sidebar.caption(\"✅ Schema Registry configured — Avro topics supported.\")",
+        "detail": "dashboard",
+        "documentation": {}
+    },
+    {
+        "label": "avro_deserializer",
+        "kind": 5,
+        "importPath": "dashboard",
+        "description": "dashboard",
+        "peekOfCode": "avro_deserializer = get_avro_deserializer(sr_conf)\nst.sidebar.write(f\"Active group id: `{group_id}`\")\nif avro_deserializer is None:\n    st.sidebar.caption(\n        \"⚠️ No Schema Registry configured — Avro topics will show a decode \"\n        \"warning instead of data.\"\n    )\nelse:\n    st.sidebar.caption(\"✅ Schema Registry configured — Avro topics supported.\")\nst.sidebar.write(\"**Subscribed topics:**\")",
         "detail": "dashboard",
         "documentation": {}
     }
