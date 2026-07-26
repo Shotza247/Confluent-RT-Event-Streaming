@@ -2,9 +2,11 @@ from confluent_kafka import Producer, Consumer
 from confluent_kafka.admin import AdminClient, NewTopic
 import sqlite3
 import json
+import os
 import random
 import time
 from datetime import datetime, timedelta, timezone
+from faker import Faker
 
 # ------------------------------------------------------
 # Read Kafka Configuration
@@ -29,21 +31,75 @@ def read_config(path="client.properties"):
 # ------------------------------------------------------
 # Sample Source Data (siloed: CRM / Employment / Tax / Applications)
 # ------------------------------------------------------
+#
+# CRM is now generated as a large, CONSISTENT (reproducible) pool of 1000
+# synthetic customers via Faker, seeded once to crm_seed.json and reused on
+# every subsequent run — see load_or_create_crm_pool(). CRM is treated as
+# the source of truth: every employment/tax/application event picks its
+# customer_id from this exact pool, so nothing downstream can reference a
+# customer that doesn't exist in CRM.
 
-CUSTOMERS = [
-    {"customer_id": "CUST-1001", "customer_name": "John Nkosi", "gender": "Male", "email": "john.cust-1001@example.com", "province": "Gauteng"},
-    {"customer_id": "CUST-1002", "customer_name": "Sarah Johnson", "gender": "Female", "email": "sarah.cust-1002@example.com", "province": "Western Cape"},
-    {"customer_id": "CUST-1003", "customer_name": "Lerato Eva Brown", "gender": "Female", "email": "lerato.cust-1003@example.com", "province": "KwaZulu-Natal"},
-    {"customer_id": "CUST-1004", "customer_name": "Emma Williams", "gender": "Female", "email": "emma.cust-1004@example.com", "province": "Eastern Cape"},
-    {"customer_id": "CUST-1005", "customer_name": "Daniel Van Jones", "gender": "Male", "email": "daniel.cust-1005@example.com", "province": "Free State"},
-    {"customer_id": "CUST-1006", "customer_name": "Thabo Miller", "gender": "Male", "email": "thabo.cust-1006@example.com", "province": "Mpumalanga"},
-    {"customer_id": "CUST-1007", "customer_name": "David Wilson", "gender": "Male", "email": "david.cust-1007@example.com", "province": "Limpopo"},
-    {"customer_id": "CUST-1008", "customer_name": "Sophia Mvambo", "gender": "Female", "email": "sophia.cust-1008@example.com", "province": "Northern Cape"},
-    {"customer_id": "CUST-1010", "customer_name": "Emily Mabatho Thomas", "gender": "Female", "email": "emily.cust-1010@example.com", "province": "Gauteng"},
+CRM_SEED_PATH = "crm_seed.json"
+CRM_SEED_SIZE = 1000
+CRM_SEED_RNG_SEED = 1234  # fixed seed -> same 1000 customers every time the file is (re)generated
+
+# Curated South African name pools (first names split by the gender they'll
+# be paired with, surnames spanning Nguni, Sotho-Tswana, Afrikaans, English,
+# and Indian-South African naming traditions) — used instead of Faker's
+# default en_US-style names, since this is a South African tax authority
+# simulation.
+SA_FIRST_NAMES_MALE = [
+    "Thabo", "Sipho", "Bongani", "Mandla", "Themba", "Vusi", "Nkosana", "Sibusiso",
+    "Andile", "Sizwe", "Lucky", "Given", "Blessing", "Kagiso", "Tumelo", "Thabang",
+    "Katlego", "Tshepo", "Lesego", "Karabo", "Johannes", "Pieter", "Hendrik", "Willem",
+    "Johan", "Andries", "Frans", "Gerhard", "David", "Michael", "James", "Peter",
+    "Mark", "Andrew", "Suresh", "Rajesh", "Kevin", "Ashwin", "Deepak", "Sanjay",
 ]
+SA_FIRST_NAMES_FEMALE = [
+    "Lindiwe", "Nomvula", "Zanele", "Precious", "Nokuthula", "Ayanda", "Zodwa", "Ntombi",
+    "Busisiwe", "Nomsa", "Palesa", "Naledi", "Refilwe", "Lesedi", "Dineo", "Boitumelo",
+    "Keitumetse", "Mmabatho", "Anlie", "Susanna", "Elsabe", "Marietjie", "Hester", "Magrieta",
+    "Sarah", "Emma", "Jessica", "Laura", "Michelle", "Karen", "Priya", "Kavitha",
+    "Anisha", "Devika", "Nasreen", "Fatima", "Aaliyah", "Zainab", "Yolanda", "Portia",
+]
+SA_SURNAMES = [
+    "Nkosi", "Dlamini", "Ndlovu", "Khumalo", "Mokoena", "Molefe", "Sithole", "Mahlangu",
+    "Zulu", "Mabaso", "Nkomo", "Radebe", "Mbeki", "Cele", "Buthelezi", "Mthembu",
+    "Ngcobo", "Tshabalala", "Mofokeng", "Motaung", "Modise", "Sebe", "Van der Merwe",
+    "Botha", "Pretorius", "Du Toit", "Van Wyk", "Kruger", "Nel", "Fourie", "Smith",
+    "Williams", "Brown", "Jones", "Wilson", "Thompson", "Naidoo", "Pillay", "Govender",
+    "Naicker", "Reddy", "Moodley", "Chetty", "Singh", "Khan", "Patel", "Ismail",
+    "Adams", "Isaacs", "Petersen",
+]
+
+# Categorical option arrays with realistic weighting (South Africa's actual
+# provincial population distribution, roughly), rather than uniform choice.
+PROVINCES = [
+    "Gauteng", "KwaZulu-Natal", "Western Cape", "Eastern Cape", "Limpopo",
+    "Mpumalanga", "North West", "Free State", "Northern Cape",
+]
+PROVINCE_WEIGHTS = [0.26, 0.19, 0.12, 0.11, 0.10, 0.08, 0.07, 0.05, 0.02]
+
+# Gender as an explicit, extensible array (not just a Male/Female binary
+# hardcoded per record) — weighted so Male/Female remain the overwhelming
+# majority while Other is represented.
+GENDERS = ["Male", "Female", "Other"]
+GENDER_WEIGHTS = [0.48, 0.49, 0.03]
+
+CRM_STATUSES = ["Active", "Dormant"]
+CRM_STATUS_WEIGHTS = [0.75, 0.25]
+
+CUSTOMER_SEGMENTS = ["Individual", "Small Business", "High Net Worth"]
+CUSTOMER_SEGMENT_WEIGHTS = [0.70, 0.20, 0.10]
 
 EMPLOYMENT_TYPES = ["Full-Time", "Part-Time", "Self-Employed", "Contractor", "Retired"]
 APPLICATION_STATUSES = ["Submitted", "Pending Review", "Under Audit", "Approved", "Rejected", "Processing", "Refund Issued", "Payment Outstanding"]
+
+# Populated by load_or_create_crm_pool() in main() before the simulation
+# loop starts. Every employment/tax/application event draws its
+# customer_id from this list, so nothing can reference a customer CRM
+# doesn't know about.
+CUSTOMERS = []
 
 TOPICS = {
     "crm": "crm_customers",
@@ -56,6 +112,84 @@ TOPICS = {
 TOPIC_TO_KEY = {v: k for k, v in TOPICS.items()}
 
 application_counter = 10001
+
+
+# ------------------------------------------------------
+# CRM customer pool — CRM is the source of truth. Generated ONCE (via a
+# locally-scoped, fixed-seed RNG so the same 1000 customers come out every
+# time it's regenerated) and cached to crm_seed.json. Every subsequent run
+# just loads the file — no Kafka/SQLite round-trip needed to check
+# "does this already exist."
+# ------------------------------------------------------
+
+def generate_synthetic_crm_pool(n=CRM_SEED_SIZE, seed=CRM_SEED_RNG_SEED):
+    """Generate n synthetic customers using Faker over curated SA name
+    pools. Uses a dedicated Faker instance + a locally-scoped
+    random.Random(seed) — NOT the global `random` module — so this is
+    fully reproducible without making the rest of the simulation
+    (employment/tax/application generation) deterministic too."""
+    fake = Faker()
+    fake.seed_instance(seed)
+    rng = random.Random(seed)
+
+    pool = []
+    for i in range(n):
+        customer_id = f"CUST-{1001 + i}"
+        gender = rng.choices(GENDERS, weights=GENDER_WEIGHTS, k=1)[0]
+        if gender == "Male":
+            first_name = fake.random_element(elements=SA_FIRST_NAMES_MALE)
+        elif gender == "Female":
+            first_name = fake.random_element(elements=SA_FIRST_NAMES_FEMALE)
+        else:
+            first_name = fake.random_element(elements=SA_FIRST_NAMES_MALE + SA_FIRST_NAMES_FEMALE)
+        surname = fake.random_element(elements=SA_SURNAMES)
+        customer_name = f"{first_name} {surname}"
+        province = rng.choices(PROVINCES, weights=PROVINCE_WEIGHTS, k=1)[0]
+        email = f"{first_name.lower()}.{customer_id.lower()}@example.com"
+
+        pool.append({
+            "customer_id": customer_id,
+            "customer_name": customer_name,
+            "gender": gender,
+            "email": email,
+            "province": province,
+        })
+    return pool
+
+
+def load_or_create_crm_pool(path=CRM_SEED_PATH, n=CRM_SEED_SIZE):
+    """Returns (pool, freshly_created). Loading an existing seed file is a
+    single os.path.exists() check + one JSON parse — far cheaper than
+    querying SQLite (depends on the consumer having run) or scanning the
+    Kafka topic from earliest (network + deserialization overhead)."""
+    if os.path.exists(path):
+        with open(path) as fh:
+            pool = json.load(fh)
+        print(f"Loaded {len(pool)} CRM customers from existing seed file '{path}'.")
+        return pool, False
+
+    pool = generate_synthetic_crm_pool(n=n)
+    with open(path, "w") as fh:
+        json.dump(pool, fh, indent=2)
+    print(f"Generated {len(pool)} new CRM customers and saved to '{path}'.")
+    return pool, True
+
+
+def seed_crm_topic(config, customers):
+    """One-time bulk seed: produce every customer in the pool to the CRM
+    topic, so the full 1000-customer master list genuinely exists in Kafka
+    up front (not just whichever customers happen to get randomly touched
+    by the ongoing simulation loop)."""
+    conf = config.copy()
+    conf["client.id"] = conf.get("client.id", "ccloud-client") + "-crm-seeder"
+    producer = Producer(conf)
+
+    print(f"Seeding {len(customers)} CRM customers into '{TOPICS['crm']}' (one-time)...")
+    for customer in customers:
+        crm_event = generate_crm_customer(customer)
+        produce_json(producer, TOPICS["crm"], customer["customer_id"], crm_event)
+    producer.flush()
+    print("CRM seeding complete.")
 
 
 # ------------------------------------------------------
@@ -125,8 +259,8 @@ def generate_crm_customer(customer):
         "email": customer["email"],
         "country": "South Africa",
         "province": customer["province"],
-        "crm_status": random.choice(["Active", "Active", "Active", "Dormant"]),
-        "customer_segment": random.choice(["Individual", "Small Business", "High Net Worth"]),
+        "crm_status": random.choices(CRM_STATUSES, weights=CRM_STATUS_WEIGHTS, k=1)[0],
+        "customer_segment": random.choices(CUSTOMER_SEGMENTS, weights=CUSTOMER_SEGMENT_WEIGHTS, k=1)[0],
         "updated_at": now_utc(),
     }
 
@@ -389,6 +523,17 @@ def main():
     config = read_config()
 
     ensure_topics_exist(config, list(TOPICS.values()))
+
+    global CUSTOMERS
+    CUSTOMERS, freshly_created = load_or_create_crm_pool()
+    if freshly_created:
+        seed_crm_topic(config, CUSTOMERS)
+    else:
+        print(
+            "CRM pool already seeded previously — skipping bulk re-seed. "
+            "Delete crm_seed.json if you want to regenerate the pool."
+        )
+
     produce_siloed_streams(config, interval_seconds=2, total_events=100)
     consume_siloed_streams(config)
 
