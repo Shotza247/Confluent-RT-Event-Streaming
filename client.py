@@ -7,6 +7,11 @@ import random
 import time
 from datetime import datetime, timedelta, timezone
 from faker import Faker
+import logging
+
+logging.basicConfig(level=logging.INFO)
+
+
 
 # ------------------------------------------------------
 # Read Kafka Configuration
