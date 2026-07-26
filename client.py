@@ -174,7 +174,9 @@ def generate_application_event(customer_id, tax_year):
 # ------------------------------------------------------
 
 def produce_siloed_streams(config, interval_seconds=2, total_events=100):
-    producer = Producer(config)
+    conf = config.copy()
+    conf["client.id"] = conf.get("client.id", "ccloud-client") + "-producer"
+    producer = Producer(conf)
     print("Producing CRM, employment, tax declaration, and application workflow events...")
     for _ in range(total_events):
         customer = random.choice(CUSTOMERS)
@@ -326,6 +328,7 @@ def consume_siloed_streams(config, group_id="siloed_ingestion_group", db_path="a
     conf = config.copy()
     conf["group.id"] = group_id
     conf["auto.offset.reset"] = "earliest"
+    conf["client.id"] = conf.get("client.id", "ccloud-client") + "-siloed-consumer"
 
     consumer = Consumer(conf)
     consumer.subscribe(list(TOPICS.values()))
