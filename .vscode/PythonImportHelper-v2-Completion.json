@@ -58,6 +58,15 @@
         "documentation": {}
     },
     {
+        "label": "os",
+        "kind": 6,
+        "isExtraImport": true,
+        "importPath": "os",
+        "description": "os",
+        "detail": "os",
+        "documentation": {}
+    },
+    {
         "label": "random",
         "kind": 6,
         "isExtraImport": true,
@@ -105,6 +114,23 @@
         "description": "datetime",
         "isExtraImport": true,
         "detail": "datetime",
+        "documentation": {}
+    },
+    {
+        "label": "Faker",
+        "importPath": "faker",
+        "description": "faker",
+        "isExtraImport": true,
+        "detail": "faker",
+        "documentation": {}
+    },
+    {
+        "label": "logging",
+        "kind": 6,
+        "isExtraImport": true,
+        "importPath": "logging",
+        "description": "logging",
+        "detail": "logging",
         "documentation": {}
     },
     {
@@ -185,6 +211,33 @@
         "documentation": {}
     },
     {
+        "label": "generate_synthetic_crm_pool",
+        "kind": 2,
+        "importPath": "client",
+        "description": "client",
+        "peekOfCode": "def generate_synthetic_crm_pool(n=CRM_SEED_SIZE, seed=CRM_SEED_RNG_SEED):\n    \"\"\"Generate n synthetic customers using Faker over curated SA name\n    pools. Uses a dedicated Faker instance + a locally-scoped\n    random.Random(seed) — NOT the global `random` module — so this is\n    fully reproducible without making the rest of the simulation\n    (employment/tax/application generation) deterministic too.\"\"\"\n    fake = Faker()\n    fake.seed_instance(seed)\n    rng = random.Random(seed)\n    pool = []",
+        "detail": "client",
+        "documentation": {}
+    },
+    {
+        "label": "load_or_create_crm_pool",
+        "kind": 2,
+        "importPath": "client",
+        "description": "client",
+        "peekOfCode": "def load_or_create_crm_pool(path=CRM_SEED_PATH, n=CRM_SEED_SIZE):\n    \"\"\"Returns (pool, freshly_created). Loading an existing seed file is a\n    single os.path.exists() check + one JSON parse — far cheaper than\n    querying SQLite (depends on the consumer having run) or scanning the\n    Kafka topic from earliest (network + deserialization overhead).\"\"\"\n    if os.path.exists(path):\n        with open(path) as fh:\n            pool = json.load(fh)\n        print(f\"Loaded {len(pool)} CRM customers from existing seed file '{path}'.\")\n        return pool, False",
+        "detail": "client",
+        "documentation": {}
+    },
+    {
+        "label": "seed_crm_topic",
+        "kind": 2,
+        "importPath": "client",
+        "description": "client",
+        "peekOfCode": "def seed_crm_topic(config, customers):\n    \"\"\"One-time bulk seed: produce every customer in the pool to the CRM\n    topic, so the full 1000-customer master list genuinely exists in Kafka\n    up front (not just whichever customers happen to get randomly touched\n    by the ongoing simulation loop).\"\"\"\n    conf = config.copy()\n    conf[\"client.id\"] = conf.get(\"client.id\", \"ccloud-client\") + \"-crm-seeder\"\n    producer = Producer(conf)\n    print(f\"Seeding {len(customers)} CRM customers into '{TOPICS['crm']}' (one-time)...\")\n    for customer in customers:",
+        "detail": "client",
+        "documentation": {}
+    },
+    {
         "label": "ensure_topics_exist",
         "kind": 2,
         "importPath": "client",
@@ -225,7 +278,7 @@
         "kind": 2,
         "importPath": "client",
         "description": "client",
-        "peekOfCode": "def generate_crm_customer(customer):\n    return {\n        \"customer_id\": customer[\"customer_id\"],\n        \"customer_name\": customer[\"customer_name\"],\n        \"gender\": customer[\"gender\"],\n        \"email\": customer[\"email\"],\n        \"country\": \"South Africa\",\n        \"province\": customer[\"province\"],\n        \"crm_status\": random.choice([\"Active\", \"Active\", \"Active\", \"Dormant\"]),\n        \"customer_segment\": random.choice([\"Individual\", \"Small Business\", \"High Net Worth\"]),",
+        "peekOfCode": "def generate_crm_customer(customer):\n    return {\n        \"customer_id\": customer[\"customer_id\"],\n        \"customer_name\": customer[\"customer_name\"],\n        \"gender\": customer[\"gender\"],\n        \"email\": customer[\"email\"],\n        \"country\": \"South Africa\",\n        \"province\": customer[\"province\"],\n        \"crm_status\": random.choices(CRM_STATUSES, weights=CRM_STATUS_WEIGHTS, k=1)[0],\n        \"customer_segment\": random.choices(CUSTOMER_SEGMENTS, weights=CUSTOMER_SEGMENT_WEIGHTS, k=1)[0],",
         "detail": "client",
         "documentation": {}
     },
@@ -261,7 +314,7 @@
         "kind": 2,
         "importPath": "client",
         "description": "client",
-        "peekOfCode": "def produce_siloed_streams(config, interval_seconds=2, total_events=100):\n    producer = Producer(config)\n    print(\"Producing CRM, employment, tax declaration, and application workflow events...\")\n    for _ in range(total_events):\n        customer = random.choice(CUSTOMERS)\n        customer_id = customer[\"customer_id\"]\n        tax_year = random.randint(2021, 2025)\n        crm_event = generate_crm_customer(customer)\n        employment_event = generate_employment_income(customer_id, tax_year)\n        tax_event = generate_tax_declaration(customer_id, tax_year, employment_event[\"income\"])",
+        "peekOfCode": "def produce_siloed_streams(config, interval_seconds=2, total_events=100):\n    conf = config.copy()\n    conf[\"client.id\"] = conf.get(\"client.id\", \"ccloud-client\") + \"-producer\"\n    producer = Producer(conf)\n    print(\"Producing CRM, employment, tax declaration, and application workflow events...\")\n    for _ in range(total_events):\n        customer = random.choice(CUSTOMERS)\n        customer_id = customer[\"customer_id\"]\n        tax_year = random.randint(2021, 2025)\n        crm_event = generate_crm_customer(customer)",
         "detail": "client",
         "documentation": {}
     },
@@ -279,7 +332,7 @@
         "kind": 2,
         "importPath": "client",
         "description": "client",
-        "peekOfCode": "def consume_siloed_streams(config, group_id=\"siloed_ingestion_group\", db_path=\"applications.db\"):\n    conf = config.copy()\n    conf[\"group.id\"] = group_id\n    conf[\"auto.offset.reset\"] = \"earliest\"\n    consumer = Consumer(conf)\n    consumer.subscribe(list(TOPICS.values()))\n    conn = sqlite3.connect(db_path)\n    cur = conn.cursor()\n    for sql in CREATE_TABLE_SQL.values():\n        cur.execute(sql)",
+        "peekOfCode": "def consume_siloed_streams(config, group_id=\"siloed_ingestion_group\", db_path=\"applications.db\"):\n    conf = config.copy()\n    conf[\"group.id\"] = group_id\n    conf[\"auto.offset.reset\"] = \"earliest\"\n    conf[\"client.id\"] = conf.get(\"client.id\", \"ccloud-client\") + \"-siloed-consumer\"\n    consumer = Consumer(conf)\n    consumer.subscribe(list(TOPICS.values()))\n    conn = sqlite3.connect(db_path)\n    cur = conn.cursor()\n    for sql in CREATE_TABLE_SQL.values():",
         "detail": "client",
         "documentation": {}
     },
@@ -288,16 +341,133 @@
         "kind": 2,
         "importPath": "client",
         "description": "client",
-        "peekOfCode": "def main():\n    config = read_config()\n    ensure_topics_exist(config, list(TOPICS.values()))\n    produce_siloed_streams(config, interval_seconds=2, total_events=100)\n    consume_siloed_streams(config)\nif __name__ == \"__main__\":\n    main()",
+        "peekOfCode": "def main():\n    config = read_config()\n    ensure_topics_exist(config, list(TOPICS.values()))\n    global CUSTOMERS\n    CUSTOMERS, freshly_created = load_or_create_crm_pool()\n    if freshly_created:\n        seed_crm_topic(config, CUSTOMERS)\n    else:\n        print(\n            \"CRM pool already seeded previously — skipping bulk re-seed. \"",
         "detail": "client",
         "documentation": {}
     },
     {
-        "label": "CUSTOMERS",
+        "label": "CRM_SEED_PATH",
         "kind": 5,
         "importPath": "client",
         "description": "client",
-        "peekOfCode": "CUSTOMERS = [\n    {\"customer_id\": \"CUST-1001\", \"customer_name\": \"John Nkosi\", \"gender\": \"Male\", \"email\": \"john.cust-1001@example.com\", \"province\": \"Gauteng\"},\n    {\"customer_id\": \"CUST-1002\", \"customer_name\": \"Sarah Johnson\", \"gender\": \"Female\", \"email\": \"sarah.cust-1002@example.com\", \"province\": \"Western Cape\"},\n    {\"customer_id\": \"CUST-1003\", \"customer_name\": \"Lerato Eva Brown\", \"gender\": \"Female\", \"email\": \"lerato.cust-1003@example.com\", \"province\": \"KwaZulu-Natal\"},\n    {\"customer_id\": \"CUST-1004\", \"customer_name\": \"Emma Williams\", \"gender\": \"Female\", \"email\": \"emma.cust-1004@example.com\", \"province\": \"Eastern Cape\"},\n    {\"customer_id\": \"CUST-1005\", \"customer_name\": \"Daniel Van Jones\", \"gender\": \"Male\", \"email\": \"daniel.cust-1005@example.com\", \"province\": \"Free State\"},\n    {\"customer_id\": \"CUST-1006\", \"customer_name\": \"Thabo Miller\", \"gender\": \"Male\", \"email\": \"thabo.cust-1006@example.com\", \"province\": \"Mpumalanga\"},\n    {\"customer_id\": \"CUST-1007\", \"customer_name\": \"David Wilson\", \"gender\": \"Male\", \"email\": \"david.cust-1007@example.com\", \"province\": \"Limpopo\"},\n    {\"customer_id\": \"CUST-1008\", \"customer_name\": \"Sophia Mvambo\", \"gender\": \"Female\", \"email\": \"sophia.cust-1008@example.com\", \"province\": \"Northern Cape\"},\n    {\"customer_id\": \"CUST-1010\", \"customer_name\": \"Emily Mabatho Thomas\", \"gender\": \"Female\", \"email\": \"emily.cust-1010@example.com\", \"province\": \"Gauteng\"},",
+        "peekOfCode": "CRM_SEED_PATH = \"crm_seed.json\"\nCRM_SEED_SIZE = 1000\nCRM_SEED_RNG_SEED = 1234  # fixed seed -> same 1000 customers every time the file is (re)generated\n# Curated South African name pools (first names split by the gender they'll\n# be paired with, surnames spanning Nguni, Sotho-Tswana, Afrikaans, English,\n# and Indian-South African naming traditions) — used instead of Faker's\n# default en_US-style names, since this is a South African tax authority\n# simulation.\nSA_FIRST_NAMES_MALE = [\n    \"Thabo\", \"Sipho\", \"Bongani\", \"Mandla\", \"Themba\", \"Vusi\", \"Nkosana\", \"Sibusiso\",",
+        "detail": "client",
+        "documentation": {}
+    },
+    {
+        "label": "CRM_SEED_SIZE",
+        "kind": 5,
+        "importPath": "client",
+        "description": "client",
+        "peekOfCode": "CRM_SEED_SIZE = 1000\nCRM_SEED_RNG_SEED = 1234  # fixed seed -> same 1000 customers every time the file is (re)generated\n# Curated South African name pools (first names split by the gender they'll\n# be paired with, surnames spanning Nguni, Sotho-Tswana, Afrikaans, English,\n# and Indian-South African naming traditions) — used instead of Faker's\n# default en_US-style names, since this is a South African tax authority\n# simulation.\nSA_FIRST_NAMES_MALE = [\n    \"Thabo\", \"Sipho\", \"Bongani\", \"Mandla\", \"Themba\", \"Vusi\", \"Nkosana\", \"Sibusiso\",\n    \"Andile\", \"Sizwe\", \"Lucky\", \"Given\", \"Blessing\", \"Kagiso\", \"Tumelo\", \"Thabang\",",
+        "detail": "client",
+        "documentation": {}
+    },
+    {
+        "label": "CRM_SEED_RNG_SEED",
+        "kind": 5,
+        "importPath": "client",
+        "description": "client",
+        "peekOfCode": "CRM_SEED_RNG_SEED = 1234  # fixed seed -> same 1000 customers every time the file is (re)generated\n# Curated South African name pools (first names split by the gender they'll\n# be paired with, surnames spanning Nguni, Sotho-Tswana, Afrikaans, English,\n# and Indian-South African naming traditions) — used instead of Faker's\n# default en_US-style names, since this is a South African tax authority\n# simulation.\nSA_FIRST_NAMES_MALE = [\n    \"Thabo\", \"Sipho\", \"Bongani\", \"Mandla\", \"Themba\", \"Vusi\", \"Nkosana\", \"Sibusiso\",\n    \"Andile\", \"Sizwe\", \"Lucky\", \"Given\", \"Blessing\", \"Kagiso\", \"Tumelo\", \"Thabang\",\n    \"Katlego\", \"Tshepo\", \"Lesego\", \"Karabo\", \"Johannes\", \"Pieter\", \"Hendrik\", \"Willem\",",
+        "detail": "client",
+        "documentation": {}
+    },
+    {
+        "label": "SA_FIRST_NAMES_MALE",
+        "kind": 5,
+        "importPath": "client",
+        "description": "client",
+        "peekOfCode": "SA_FIRST_NAMES_MALE = [\n    \"Thabo\", \"Sipho\", \"Bongani\", \"Mandla\", \"Themba\", \"Vusi\", \"Nkosana\", \"Sibusiso\",\n    \"Andile\", \"Sizwe\", \"Lucky\", \"Given\", \"Blessing\", \"Kagiso\", \"Tumelo\", \"Thabang\",\n    \"Katlego\", \"Tshepo\", \"Lesego\", \"Karabo\", \"Johannes\", \"Pieter\", \"Hendrik\", \"Willem\",\n    \"Johan\", \"Andries\", \"Frans\", \"Gerhard\", \"David\", \"Michael\", \"James\", \"Peter\",\n    \"Mark\", \"Andrew\", \"Suresh\", \"Rajesh\", \"Kevin\", \"Ashwin\", \"Deepak\", \"Sanjay\",\n]\nSA_FIRST_NAMES_FEMALE = [\n    \"Lindiwe\", \"Nomvula\", \"Zanele\", \"Precious\", \"Nokuthula\", \"Ayanda\", \"Zodwa\", \"Ntombi\",\n    \"Busisiwe\", \"Nomsa\", \"Palesa\", \"Naledi\", \"Refilwe\", \"Lesedi\", \"Dineo\", \"Boitumelo\",",
+        "detail": "client",
+        "documentation": {}
+    },
+    {
+        "label": "SA_FIRST_NAMES_FEMALE",
+        "kind": 5,
+        "importPath": "client",
+        "description": "client",
+        "peekOfCode": "SA_FIRST_NAMES_FEMALE = [\n    \"Lindiwe\", \"Nomvula\", \"Zanele\", \"Precious\", \"Nokuthula\", \"Ayanda\", \"Zodwa\", \"Ntombi\",\n    \"Busisiwe\", \"Nomsa\", \"Palesa\", \"Naledi\", \"Refilwe\", \"Lesedi\", \"Dineo\", \"Boitumelo\",\n    \"Keitumetse\", \"Mmabatho\", \"Anlie\", \"Susanna\", \"Elsabe\", \"Marietjie\", \"Hester\", \"Magrieta\",\n    \"Sarah\", \"Emma\", \"Jessica\", \"Laura\", \"Michelle\", \"Karen\", \"Priya\", \"Kavitha\",\n    \"Anisha\", \"Devika\", \"Nasreen\", \"Fatima\", \"Aaliyah\", \"Zainab\", \"Yolanda\", \"Portia\",\n]\nSA_SURNAMES = [\n    \"Nkosi\", \"Dlamini\", \"Ndlovu\", \"Khumalo\", \"Mokoena\", \"Molefe\", \"Sithole\", \"Mahlangu\",\n    \"Zulu\", \"Mabaso\", \"Nkomo\", \"Radebe\", \"Mbeki\", \"Cele\", \"Buthelezi\", \"Mthembu\",",
+        "detail": "client",
+        "documentation": {}
+    },
+    {
+        "label": "SA_SURNAMES",
+        "kind": 5,
+        "importPath": "client",
+        "description": "client",
+        "peekOfCode": "SA_SURNAMES = [\n    \"Nkosi\", \"Dlamini\", \"Ndlovu\", \"Khumalo\", \"Mokoena\", \"Molefe\", \"Sithole\", \"Mahlangu\",\n    \"Zulu\", \"Mabaso\", \"Nkomo\", \"Radebe\", \"Mbeki\", \"Cele\", \"Buthelezi\", \"Mthembu\",\n    \"Ngcobo\", \"Tshabalala\", \"Mofokeng\", \"Motaung\", \"Modise\", \"Sebe\", \"Van der Merwe\",\n    \"Botha\", \"Pretorius\", \"Du Toit\", \"Van Wyk\", \"Kruger\", \"Nel\", \"Fourie\", \"Smith\",\n    \"Williams\", \"Brown\", \"Jones\", \"Wilson\", \"Thompson\", \"Naidoo\", \"Pillay\", \"Govender\",\n    \"Naicker\", \"Reddy\", \"Moodley\", \"Chetty\", \"Singh\", \"Khan\", \"Patel\", \"Ismail\",\n    \"Adams\", \"Isaacs\", \"Petersen\",\n]\n# Categorical option arrays with realistic weighting (South Africa's actual",
+        "detail": "client",
+        "documentation": {}
+    },
+    {
+        "label": "PROVINCES",
+        "kind": 5,
+        "importPath": "client",
+        "description": "client",
+        "peekOfCode": "PROVINCES = [\n    \"Gauteng\", \"KwaZulu-Natal\", \"Western Cape\", \"Eastern Cape\", \"Limpopo\",\n    \"Mpumalanga\", \"North West\", \"Free State\", \"Northern Cape\",\n]\nPROVINCE_WEIGHTS = [0.26, 0.19, 0.12, 0.11, 0.10, 0.08, 0.07, 0.05, 0.02]\n# Gender as an explicit, extensible array (not just a Male/Female binary\n# hardcoded per record) — weighted so Male/Female remain the overwhelming\n# majority while Other is represented.\nGENDERS = [\"Male\", \"Female\", \"Other\"]\nGENDER_WEIGHTS = [0.48, 0.49, 0.03]",
+        "detail": "client",
+        "documentation": {}
+    },
+    {
+        "label": "PROVINCE_WEIGHTS",
+        "kind": 5,
+        "importPath": "client",
+        "description": "client",
+        "peekOfCode": "PROVINCE_WEIGHTS = [0.26, 0.19, 0.12, 0.11, 0.10, 0.08, 0.07, 0.05, 0.02]\n# Gender as an explicit, extensible array (not just a Male/Female binary\n# hardcoded per record) — weighted so Male/Female remain the overwhelming\n# majority while Other is represented.\nGENDERS = [\"Male\", \"Female\", \"Other\"]\nGENDER_WEIGHTS = [0.48, 0.49, 0.03]\nCRM_STATUSES = [\"Active\", \"Dormant\"]\nCRM_STATUS_WEIGHTS = [0.75, 0.25]\nCUSTOMER_SEGMENTS = [\"Individual\", \"Small Business\", \"High Net Worth\"]\nCUSTOMER_SEGMENT_WEIGHTS = [0.70, 0.20, 0.10]",
+        "detail": "client",
+        "documentation": {}
+    },
+    {
+        "label": "GENDERS",
+        "kind": 5,
+        "importPath": "client",
+        "description": "client",
+        "peekOfCode": "GENDERS = [\"Male\", \"Female\", \"Other\"]\nGENDER_WEIGHTS = [0.48, 0.49, 0.03]\nCRM_STATUSES = [\"Active\", \"Dormant\"]\nCRM_STATUS_WEIGHTS = [0.75, 0.25]\nCUSTOMER_SEGMENTS = [\"Individual\", \"Small Business\", \"High Net Worth\"]\nCUSTOMER_SEGMENT_WEIGHTS = [0.70, 0.20, 0.10]\nEMPLOYMENT_TYPES = [\"Full-Time\", \"Part-Time\", \"Self-Employed\", \"Contractor\", \"Retired\"]\nAPPLICATION_STATUSES = [\"Submitted\", \"Pending Review\", \"Under Audit\", \"Approved\", \"Rejected\", \"Processing\", \"Refund Issued\", \"Payment Outstanding\"]\n# Populated by load_or_create_crm_pool() in main() before the simulation\n# loop starts. Every employment/tax/application event draws its",
+        "detail": "client",
+        "documentation": {}
+    },
+    {
+        "label": "GENDER_WEIGHTS",
+        "kind": 5,
+        "importPath": "client",
+        "description": "client",
+        "peekOfCode": "GENDER_WEIGHTS = [0.48, 0.49, 0.03]\nCRM_STATUSES = [\"Active\", \"Dormant\"]\nCRM_STATUS_WEIGHTS = [0.75, 0.25]\nCUSTOMER_SEGMENTS = [\"Individual\", \"Small Business\", \"High Net Worth\"]\nCUSTOMER_SEGMENT_WEIGHTS = [0.70, 0.20, 0.10]\nEMPLOYMENT_TYPES = [\"Full-Time\", \"Part-Time\", \"Self-Employed\", \"Contractor\", \"Retired\"]\nAPPLICATION_STATUSES = [\"Submitted\", \"Pending Review\", \"Under Audit\", \"Approved\", \"Rejected\", \"Processing\", \"Refund Issued\", \"Payment Outstanding\"]\n# Populated by load_or_create_crm_pool() in main() before the simulation\n# loop starts. Every employment/tax/application event draws its\n# customer_id from this list, so nothing can reference a customer CRM",
+        "detail": "client",
+        "documentation": {}
+    },
+    {
+        "label": "CRM_STATUSES",
+        "kind": 5,
+        "importPath": "client",
+        "description": "client",
+        "peekOfCode": "CRM_STATUSES = [\"Active\", \"Dormant\"]\nCRM_STATUS_WEIGHTS = [0.75, 0.25]\nCUSTOMER_SEGMENTS = [\"Individual\", \"Small Business\", \"High Net Worth\"]\nCUSTOMER_SEGMENT_WEIGHTS = [0.70, 0.20, 0.10]\nEMPLOYMENT_TYPES = [\"Full-Time\", \"Part-Time\", \"Self-Employed\", \"Contractor\", \"Retired\"]\nAPPLICATION_STATUSES = [\"Submitted\", \"Pending Review\", \"Under Audit\", \"Approved\", \"Rejected\", \"Processing\", \"Refund Issued\", \"Payment Outstanding\"]\n# Populated by load_or_create_crm_pool() in main() before the simulation\n# loop starts. Every employment/tax/application event draws its\n# customer_id from this list, so nothing can reference a customer CRM\n# doesn't know about.",
+        "detail": "client",
+        "documentation": {}
+    },
+    {
+        "label": "CRM_STATUS_WEIGHTS",
+        "kind": 5,
+        "importPath": "client",
+        "description": "client",
+        "peekOfCode": "CRM_STATUS_WEIGHTS = [0.75, 0.25]\nCUSTOMER_SEGMENTS = [\"Individual\", \"Small Business\", \"High Net Worth\"]\nCUSTOMER_SEGMENT_WEIGHTS = [0.70, 0.20, 0.10]\nEMPLOYMENT_TYPES = [\"Full-Time\", \"Part-Time\", \"Self-Employed\", \"Contractor\", \"Retired\"]\nAPPLICATION_STATUSES = [\"Submitted\", \"Pending Review\", \"Under Audit\", \"Approved\", \"Rejected\", \"Processing\", \"Refund Issued\", \"Payment Outstanding\"]\n# Populated by load_or_create_crm_pool() in main() before the simulation\n# loop starts. Every employment/tax/application event draws its\n# customer_id from this list, so nothing can reference a customer CRM\n# doesn't know about.\nCUSTOMERS = []",
+        "detail": "client",
+        "documentation": {}
+    },
+    {
+        "label": "CUSTOMER_SEGMENTS",
+        "kind": 5,
+        "importPath": "client",
+        "description": "client",
+        "peekOfCode": "CUSTOMER_SEGMENTS = [\"Individual\", \"Small Business\", \"High Net Worth\"]\nCUSTOMER_SEGMENT_WEIGHTS = [0.70, 0.20, 0.10]\nEMPLOYMENT_TYPES = [\"Full-Time\", \"Part-Time\", \"Self-Employed\", \"Contractor\", \"Retired\"]\nAPPLICATION_STATUSES = [\"Submitted\", \"Pending Review\", \"Under Audit\", \"Approved\", \"Rejected\", \"Processing\", \"Refund Issued\", \"Payment Outstanding\"]\n# Populated by load_or_create_crm_pool() in main() before the simulation\n# loop starts. Every employment/tax/application event draws its\n# customer_id from this list, so nothing can reference a customer CRM\n# doesn't know about.\nCUSTOMERS = []\nTOPICS = {",
+        "detail": "client",
+        "documentation": {}
+    },
+    {
+        "label": "CUSTOMER_SEGMENT_WEIGHTS",
+        "kind": 5,
+        "importPath": "client",
+        "description": "client",
+        "peekOfCode": "CUSTOMER_SEGMENT_WEIGHTS = [0.70, 0.20, 0.10]\nEMPLOYMENT_TYPES = [\"Full-Time\", \"Part-Time\", \"Self-Employed\", \"Contractor\", \"Retired\"]\nAPPLICATION_STATUSES = [\"Submitted\", \"Pending Review\", \"Under Audit\", \"Approved\", \"Rejected\", \"Processing\", \"Refund Issued\", \"Payment Outstanding\"]\n# Populated by load_or_create_crm_pool() in main() before the simulation\n# loop starts. Every employment/tax/application event draws its\n# customer_id from this list, so nothing can reference a customer CRM\n# doesn't know about.\nCUSTOMERS = []\nTOPICS = {\n    \"crm\": \"crm_customers\",",
         "detail": "client",
         "documentation": {}
     },
@@ -306,7 +476,7 @@
         "kind": 5,
         "importPath": "client",
         "description": "client",
-        "peekOfCode": "EMPLOYMENT_TYPES = [\"Full-Time\", \"Part-Time\", \"Self-Employed\", \"Contractor\", \"Retired\"]\nAPPLICATION_STATUSES = [\"Submitted\", \"Pending Review\", \"Under Audit\", \"Approved\", \"Rejected\", \"Processing\", \"Refund Issued\", \"Payment Outstanding\"]\nTOPICS = {\n    \"crm\": \"crm_customers\",\n    \"employment\": \"employment_income_records\",\n    \"tax\": \"tax_declaration_records\",\n    \"applications\": \"tax_application_events\",\n}\n# Reverse lookup: topic name -> friendly key, used by the consumer to route\n# each incoming message to the right SQLite table.",
+        "peekOfCode": "EMPLOYMENT_TYPES = [\"Full-Time\", \"Part-Time\", \"Self-Employed\", \"Contractor\", \"Retired\"]\nAPPLICATION_STATUSES = [\"Submitted\", \"Pending Review\", \"Under Audit\", \"Approved\", \"Rejected\", \"Processing\", \"Refund Issued\", \"Payment Outstanding\"]\n# Populated by load_or_create_crm_pool() in main() before the simulation\n# loop starts. Every employment/tax/application event draws its\n# customer_id from this list, so nothing can reference a customer CRM\n# doesn't know about.\nCUSTOMERS = []\nTOPICS = {\n    \"crm\": \"crm_customers\",\n    \"employment\": \"employment_income_records\",",
         "detail": "client",
         "documentation": {}
     },
@@ -315,7 +485,16 @@
         "kind": 5,
         "importPath": "client",
         "description": "client",
-        "peekOfCode": "APPLICATION_STATUSES = [\"Submitted\", \"Pending Review\", \"Under Audit\", \"Approved\", \"Rejected\", \"Processing\", \"Refund Issued\", \"Payment Outstanding\"]\nTOPICS = {\n    \"crm\": \"crm_customers\",\n    \"employment\": \"employment_income_records\",\n    \"tax\": \"tax_declaration_records\",\n    \"applications\": \"tax_application_events\",\n}\n# Reverse lookup: topic name -> friendly key, used by the consumer to route\n# each incoming message to the right SQLite table.\nTOPIC_TO_KEY = {v: k for k, v in TOPICS.items()}",
+        "peekOfCode": "APPLICATION_STATUSES = [\"Submitted\", \"Pending Review\", \"Under Audit\", \"Approved\", \"Rejected\", \"Processing\", \"Refund Issued\", \"Payment Outstanding\"]\n# Populated by load_or_create_crm_pool() in main() before the simulation\n# loop starts. Every employment/tax/application event draws its\n# customer_id from this list, so nothing can reference a customer CRM\n# doesn't know about.\nCUSTOMERS = []\nTOPICS = {\n    \"crm\": \"crm_customers\",\n    \"employment\": \"employment_income_records\",\n    \"tax\": \"tax_declaration_records\",",
+        "detail": "client",
+        "documentation": {}
+    },
+    {
+        "label": "CUSTOMERS",
+        "kind": 5,
+        "importPath": "client",
+        "description": "client",
+        "peekOfCode": "CUSTOMERS = []\nTOPICS = {\n    \"crm\": \"crm_customers\",\n    \"employment\": \"employment_income_records\",\n    \"tax\": \"tax_declaration_records\",\n    \"applications\": \"tax_application_events\",\n}\n# Reverse lookup: topic name -> friendly key, used by the consumer to route\n# each incoming message to the right SQLite table.\nTOPIC_TO_KEY = {v: k for k, v in TOPICS.items()}",
         "detail": "client",
         "documentation": {}
     },
@@ -333,7 +512,7 @@
         "kind": 5,
         "importPath": "client",
         "description": "client",
-        "peekOfCode": "TOPIC_TO_KEY = {v: k for k, v in TOPICS.items()}\napplication_counter = 10001\n# ------------------------------------------------------\n# Topic setup — Confluent Cloud does NOT auto-create topics on produce,\n# so ensure they exist before we try to write to them. Idempotent: safe\n# to call on every run.\n# ------------------------------------------------------\ndef ensure_topics_exist(config, topics, num_partitions=6, replication_factor=3):\n    admin_conf = {\n        k: v for k, v in config.items()",
+        "peekOfCode": "TOPIC_TO_KEY = {v: k for k, v in TOPICS.items()}\napplication_counter = 10001\n# ------------------------------------------------------\n# CRM customer pool — CRM is the source of truth. Generated ONCE (via a\n# locally-scoped, fixed-seed RNG so the same 1000 customers come out every\n# time it's regenerated) and cached to crm_seed.json. Every subsequent run\n# just loads the file — no Kafka/SQLite round-trip needed to check\n# \"does this already exist.\"\n# ------------------------------------------------------\ndef generate_synthetic_crm_pool(n=CRM_SEED_SIZE, seed=CRM_SEED_RNG_SEED):",
         "detail": "client",
         "documentation": {}
     },
@@ -342,7 +521,7 @@
         "kind": 5,
         "importPath": "client",
         "description": "client",
-        "peekOfCode": "application_counter = 10001\n# ------------------------------------------------------\n# Topic setup — Confluent Cloud does NOT auto-create topics on produce,\n# so ensure they exist before we try to write to them. Idempotent: safe\n# to call on every run.\n# ------------------------------------------------------\ndef ensure_topics_exist(config, topics, num_partitions=6, replication_factor=3):\n    admin_conf = {\n        k: v for k, v in config.items()\n        if k not in (\"group.id\", \"auto.offset.reset\")",
+        "peekOfCode": "application_counter = 10001\n# ------------------------------------------------------\n# CRM customer pool — CRM is the source of truth. Generated ONCE (via a\n# locally-scoped, fixed-seed RNG so the same 1000 customers come out every\n# time it's regenerated) and cached to crm_seed.json. Every subsequent run\n# just loads the file — no Kafka/SQLite round-trip needed to check\n# \"does this already exist.\"\n# ------------------------------------------------------\ndef generate_synthetic_crm_pool(n=CRM_SEED_SIZE, seed=CRM_SEED_RNG_SEED):\n    \"\"\"Generate n synthetic customers using Faker over curated SA name",
         "detail": "client",
         "documentation": {}
     },
@@ -369,7 +548,7 @@
         "kind": 2,
         "importPath": "dashboard",
         "description": "dashboard",
-        "peekOfCode": "def style(fig):\n    fig.update_layout(**CHART_LAYOUT)\n    return fig\n@st.cache_resource\ndef load_config(path=CONFIG_PATH):\n    \"\"\"Load Kafka (+ Schema Registry, if present) client config.\n    Priority:\n    1. Streamlit secrets (st.secrets[\"kafka\"]) — used on Streamlit Community\n       Cloud, where client.properties is never committed to the repo.\n    2. Local client.properties file — used for local development.",
+        "peekOfCode": "def style(fig):\n    fig.update_layout(**CHART_LAYOUT)\n    return fig\n# ---- Fixed, consistent color maps per categorical dimension ----\n# Same province/status/etc always renders in the same color, everywhere.\nPROVINCE_COLORS = {\n    \"Gauteng\": \"#EAB308\",         # gold\n    \"Free State\": \"#F43F5E\",      # red\n    \"KwaZulu-Natal\": \"#38BDF8\",   # blue\n    \"Limpopo\": \"#22C55E\",         # green",
         "detail": "dashboard",
         "documentation": {}
     },
@@ -378,7 +557,7 @@
         "kind": 2,
         "importPath": "dashboard",
         "description": "dashboard",
-        "peekOfCode": "def load_config(path=CONFIG_PATH):\n    \"\"\"Load Kafka (+ Schema Registry, if present) client config.\n    Priority:\n    1. Streamlit secrets (st.secrets[\"kafka\"]) — used on Streamlit Community\n       Cloud, where client.properties is never committed to the repo.\n    2. Local client.properties file — used for local development.\n    Schema Registry settings, if you add them, should use the\n    \"schema.registry.\" prefix, e.g.:\n        schema.registry.url=https://psrc-xxxxx.region.aws.confluent.cloud\n        schema.registry.basic.auth.user.info=SR_API_KEY:SR_API_SECRET",
+        "peekOfCode": "def load_config(path=CONFIG_PATH):\n    try:\n        has_kafka_secret = \"kafka\" in st.secrets\n    except st.errors.StreamlitSecretNotFoundError:\n        has_kafka_secret = False\n    if has_kafka_secret:\n        raw = dict(st.secrets[\"kafka\"])\n        flat = {}\n        for k, v in raw.items():\n            if hasattr(v, \"items\"):",
         "detail": "dashboard",
         "documentation": {}
     },
@@ -387,7 +566,7 @@
         "kind": 2,
         "importPath": "dashboard",
         "description": "dashboard",
-        "peekOfCode": "def split_kafka_and_schema_registry_config(config):\n    \"\"\"Separate plain Kafka client config from schema.registry.* config.\"\"\"\n    kafka_conf = {}\n    sr_conf = {}\n    for k, v in config.items():\n        if k.startswith(\"schema.registry.\"):\n            sr_conf[k[len(\"schema.registry.\"):]] = v\n        else:\n            kafka_conf[k] = v\n    return kafka_conf, sr_conf",
+        "peekOfCode": "def split_kafka_and_schema_registry_config(config):\n    kafka_conf = {}\n    sr_conf = {}\n    for k, v in config.items():\n        if k.startswith(\"schema.registry.\"):\n            sr_conf[k[len(\"schema.registry.\"):]] = v\n        else:\n            kafka_conf[k] = v\n    return kafka_conf, sr_conf\n@st.cache_resource",
         "detail": "dashboard",
         "documentation": {}
     },
@@ -396,7 +575,7 @@
         "kind": 2,
         "importPath": "dashboard",
         "description": "dashboard",
-        "peekOfCode": "def get_consumer(_kafka_conf, group_id, topics):\n    \"\"\"Create ONE Kafka consumer subscribed to ALL topics, cached across\n    Streamlit reruns. Messages are routed to the right buffer using\n    msg.topic() in the poll loop below.\n    Without @st.cache_resource, a brand new consumer (with the same\n    group.id) would be created on every rerun, repeatedly triggering a\n    consumer-group rebalance.\n    \"\"\"\n    conf = _kafka_conf.copy()\n    conf[\"group.id\"] = group_id",
+        "peekOfCode": "def get_consumer(_kafka_conf, group_id, topics):\n    conf = _kafka_conf.copy()\n    conf[\"group.id\"] = group_id\n    conf.setdefault(\"auto.offset.reset\", \"earliest\")\n    consumer = Consumer(conf)\n    consumer.subscribe(list(topics))\n    return consumer\n@st.cache_resource\ndef get_avro_deserializer(_sr_conf):\n    if not _sr_conf.get(\"url\"):",
         "detail": "dashboard",
         "documentation": {}
     },
@@ -405,7 +584,7 @@
         "kind": 2,
         "importPath": "dashboard",
         "description": "dashboard",
-        "peekOfCode": "def get_avro_deserializer(_sr_conf):\n    \"\"\"Build a schema-registry-aware Avro deserializer, if SR config is\n    present. Returns None if no schema.registry.* settings were provided —\n    in that case Avro topics will show a clear warning instead of silently\n    failing.\n    Passing schema_str=None to AvroDeserializer means it looks up the\n    correct writer schema per-message from the registry (using the schema\n    ID embedded in the Confluent wire format), so ONE deserializer works\n    across all your Flink topics even though they have different schemas.\n    \"\"\"",
+        "peekOfCode": "def get_avro_deserializer(_sr_conf):\n    if not _sr_conf.get(\"url\"):\n        return None\n    client = SchemaRegistryClient(_sr_conf)\n    return AvroDeserializer(client, schema_str=None)\ndef safe_deserialize(msg, avro_deserializer):\n    try:\n        key = msg.key().decode(\"utf-8\") if msg.key() else None\n    except UnicodeDecodeError:\n        key = None",
         "detail": "dashboard",
         "documentation": {}
     },
@@ -414,7 +593,16 @@
         "kind": 2,
         "importPath": "dashboard",
         "description": "dashboard",
-        "peekOfCode": "def safe_deserialize(msg, avro_deserializer):\n    \"\"\"Try JSON first, then Avro (if a schema registry is configured).\n    Returns (value_dict, key, error_str).\"\"\"\n    try:\n        key = msg.key().decode(\"utf-8\") if msg.key() else None\n    except UnicodeDecodeError:\n        key = None\n    raw_value = msg.value()\n    # Attempt 1: plain JSON (works for your raw producer topic, and any\n    # Flink topic explicitly created with 'value.format' = 'json-registry')",
+        "peekOfCode": "def safe_deserialize(msg, avro_deserializer):\n    try:\n        key = msg.key().decode(\"utf-8\") if msg.key() else None\n    except UnicodeDecodeError:\n        key = None\n    raw_value = msg.value()\n    try:\n        value = json.loads(raw_value.decode(\"utf-8\"))\n        return value, key, None\n    except UnicodeDecodeError:",
+        "detail": "dashboard",
+        "documentation": {}
+    },
+    {
+        "label": "assign_quadrant",
+        "kind": 2,
+        "importPath": "dashboard",
+        "description": "dashboard",
+        "peekOfCode": "def assign_quadrant(row):\n    hi_income = row.get(\"is_high_income\") == 1\n    hi_tax = row.get(\"is_high_tax\") == 1\n    if hi_income and hi_tax:\n        return \"High Income & High Tax\"\n    if hi_income:\n        return \"High Income Only\"\n    if hi_tax:\n        return \"High Tax Only\"\n    return \"Baseline\"",
         "detail": "dashboard",
         "documentation": {}
     },
@@ -423,25 +611,43 @@
         "kind": 2,
         "importPath": "dashboard",
         "description": "dashboard",
-        "peekOfCode": "def live_dashboard():\n    new_counts = {t: 0 for t in ALL_TOPICS}\n    for _ in range(int(poll_batch_size)):\n        msg = consumer.poll(timeout=0.2)\n        if msg is None:\n            break\n        if msg.error():\n            continue\n        topic = msg.topic()\n        value, key, err = safe_deserialize(msg, avro_deserializer)",
+        "peekOfCode": "def live_dashboard():\n    for _ in range(int(poll_batch_size)):\n        msg = consumer.poll(timeout=0.2)\n        if msg is None:\n            break\n        if msg.error():\n            continue\n        topic = msg.topic()\n        value, key, err = safe_deserialize(msg, avro_deserializer)\n        if err is not None:",
         "detail": "dashboard",
         "documentation": {}
     },
     {
-        "label": "render_raw_feed",
+        "label": "render_overview",
         "kind": 2,
         "importPath": "dashboard",
         "description": "dashboard",
-        "peekOfCode": "def render_raw_feed(df):\n    \"\"\"Rich, hand-tuned view for the raw producer topic.\"\"\"\n    total = len(df)\n    avg_tax = pd.to_numeric(df.get(\"tax_due\"), errors=\"coerce\").mean()\n    avg_income = pd.to_numeric(df.get(\"income\"), errors=\"coerce\").mean()\n    col1, col2, col3, col4 = st.columns(4)\n    col1.metric(\"Total events\", total)\n    col2.metric(\"Avg tax_due\", f\"{avg_tax:,.2f}\" if pd.notna(avg_tax) else \"—\")\n    col3.metric(\"Avg income\", f\"{avg_income:,.2f}\" if pd.notna(avg_income) else \"—\")\n    col4.metric(",
+        "peekOfCode": "def render_overview(df):\n    total = len(df)\n    total_tax = pd.to_numeric(df.get(\"tax_due\"), errors=\"coerce\").sum()\n    avg_income = pd.to_numeric(df.get(\"income\"), errors=\"coerce\").mean()\n    n_customers = df[\"customer_id\"].nunique() if \"customer_id\" in df.columns else 0\n    c1, c2, c3, c4 = st.columns(4)\n    c1.metric(\"Applications\", total)\n    c2.metric(\"Total tax due\", f\"R{total_tax:,.0f}\" if pd.notna(total_tax) else \"—\")\n    c3.metric(\"Avg income\", f\"R{avg_income:,.0f}\" if pd.notna(avg_income) else \"—\")\n    c4.metric(\"Distinct customers\", n_customers)",
         "detail": "dashboard",
         "documentation": {}
     },
     {
-        "label": "render_flink_topic",
+        "label": "render_tax_income",
         "kind": 2,
         "importPath": "dashboard",
         "description": "dashboard",
-        "peekOfCode": "def render_flink_topic(df, label):\n    \"\"\"Generic view for Flink-derived topics, whose exact schema we haven't\n    confirmed yet. Shows KPIs + an auto-detected chart, plus the raw\n    records so you can sanity-check the actual fields against what I've\n    assumed. Once you confirm the real field names, tell me and I'll\n    tailor a proper view per topic.\"\"\"\n    total = len(df)\n    st.metric(\"Total records\", total)\n    numeric_cols = [\n        c for c in df.columns",
+        "peekOfCode": "def render_tax_income(df):\n    d = df.copy()\n    d[\"income\"] = pd.to_numeric(d.get(\"income\"), errors=\"coerce\")\n    d[\"tax_due\"] = pd.to_numeric(d.get(\"tax_due\"), errors=\"coerce\")\n    d[\"effective_tax_rate\"] = pd.to_numeric(d.get(\"effective_tax_rate\"), errors=\"coerce\")\n    st.caption(\n        \"Quadrant view: is high income paired with high tax (expected, \"\n        \"progressive tax working) or not (worth a closer look)?\"\n    )\n    if {\"income\", \"effective_tax_rate\"}.issubset(d.columns):",
+        "detail": "dashboard",
+        "documentation": {}
+    },
+    {
+        "label": "render_operations",
+        "kind": 2,
+        "importPath": "dashboard",
+        "description": "dashboard",
+        "peekOfCode": "def render_operations(df):\n    d = df.copy()\n    col1, col2 = st.columns(2)\n    if {\"province\", \"status\"}.issubset(d.columns):\n        pivot = d.groupby([\"province\", \"status\"]).size().reset_index(name=\"count\")\n        fig = px.bar(\n            pivot, x=\"province\", y=\"count\", color=\"status\",\n            color_discrete_map=STATUS_COLORS,\n            title=\"Status Breakdown by Province\", barmode=\"stack\",\n        )",
+        "detail": "dashboard",
+        "documentation": {}
+    },
+    {
+        "label": "render_customer_risk",
+        "kind": 2,
+        "importPath": "dashboard",
+        "description": "dashboard",
+        "peekOfCode": "def render_customer_risk(df_risk):\n    if df_risk.empty:\n        st.write(\"No data yet on `customer_risk_profile` — waiting for messages.\")\n        return\n    d = df_risk.copy()\n    for col in [\"total_applications\", \"high_tax_count\", \"high_income_count\",\n                \"avg_effective_tax_rate\", \"max_effective_tax_rate\", \"lifetime_tax_paid\"]:\n        if col in d.columns:\n            d[col] = pd.to_numeric(d[col], errors=\"coerce\")\n    # customer_risk_profile is keyed by customer_id with continuous",
         "detail": "dashboard",
         "documentation": {}
     },
@@ -450,25 +656,25 @@
         "kind": 5,
         "importPath": "dashboard",
         "description": "dashboard",
-        "peekOfCode": "CONFIG_PATH = \"client.properties\"\n# ---- Topics ----\nRAW_TOPIC = \"tax-evaluation-applications\"\n# Flink-derived topics, from your Confluent Cloud Stream Lineage graph.\n#\n# VERIFY THESE: two names were truncated in the screenshot you shared —\n# \"high_income_applicatio...\" and \"employment_summary_...\". I've guessed\n# high_income_applications and employment_summary_table (matching the\n# _table naming pattern used by tax_year_summary_table /\n# regional_summary_table). If either is wrong, that tab will just silently",
+        "peekOfCode": "CONFIG_PATH = \"client.properties\"\nANALYTICS_TOPIC = \"application_analytics\"\nRISK_TOPIC = \"customer_risk_profile\"\nALL_TOPICS = [ANALYTICS_TOPIC, RISK_TOPIC]\nst.set_page_config(page_title=\"Tax Applications Analytics\", layout=\"wide\")\n# ---- Palette ----\nBG = \"#0F172A\"\nGRID = \"#334155\"\nTEXT = \"#F8FAFC\"\nCHART_LAYOUT = dict(",
         "detail": "dashboard",
         "documentation": {}
     },
     {
-        "label": "RAW_TOPIC",
+        "label": "ANALYTICS_TOPIC",
         "kind": 5,
         "importPath": "dashboard",
         "description": "dashboard",
-        "peekOfCode": "RAW_TOPIC = \"tax-evaluation-applications\"\n# Flink-derived topics, from your Confluent Cloud Stream Lineage graph.\n#\n# VERIFY THESE: two names were truncated in the screenshot you shared —\n# \"high_income_applicatio...\" and \"employment_summary_...\". I've guessed\n# high_income_applications and employment_summary_table (matching the\n# _table naming pattern used by tax_year_summary_table /\n# regional_summary_table). If either is wrong, that tab will just silently\n# show \"no data yet\" forever — Kafka doesn't error on subscribing to a\n# topic name that doesn't match, it just never receives anything for it.",
+        "peekOfCode": "ANALYTICS_TOPIC = \"application_analytics\"\nRISK_TOPIC = \"customer_risk_profile\"\nALL_TOPICS = [ANALYTICS_TOPIC, RISK_TOPIC]\nst.set_page_config(page_title=\"Tax Applications Analytics\", layout=\"wide\")\n# ---- Palette ----\nBG = \"#0F172A\"\nGRID = \"#334155\"\nTEXT = \"#F8FAFC\"\nCHART_LAYOUT = dict(\n    paper_bgcolor=BG,",
         "detail": "dashboard",
         "documentation": {}
     },
     {
-        "label": "FLINK_TOPICS",
+        "label": "RISK_TOPIC",
         "kind": 5,
         "importPath": "dashboard",
         "description": "dashboard",
-        "peekOfCode": "FLINK_TOPICS = {\n    \"High Income Applications\": \"high_income_applications\",\n    \"Status Summary\": \"status_summary\",\n    \"Tax Year Summary\": \"tax_year_summary_table\",\n    \"Regional Summary\": \"regional_summary_table\",\n    \"Province Tax Revenue\": \"province_tax_revenue\",\n    \"Income by Employment\": \"income_by_employment\",\n    \"High Tax Due\": \"high_tax_due\",\n    \"Employment Summary\": \"employment_summary_table\",  # <-- verify exact name\n}",
+        "peekOfCode": "RISK_TOPIC = \"customer_risk_profile\"\nALL_TOPICS = [ANALYTICS_TOPIC, RISK_TOPIC]\nst.set_page_config(page_title=\"Tax Applications Analytics\", layout=\"wide\")\n# ---- Palette ----\nBG = \"#0F172A\"\nGRID = \"#334155\"\nTEXT = \"#F8FAFC\"\nCHART_LAYOUT = dict(\n    paper_bgcolor=BG,\n    plot_bgcolor=BG,",
         "detail": "dashboard",
         "documentation": {}
     },
@@ -477,7 +683,7 @@
         "kind": 5,
         "importPath": "dashboard",
         "description": "dashboard",
-        "peekOfCode": "ALL_TOPICS = [RAW_TOPIC] + list(FLINK_TOPICS.values())\nst.set_page_config(page_title=\"Tax Applications Dashboard\", layout=\"wide\")\n# ---- Palette ----\nBG = \"#0F172A\"\nGRID = \"#334155\"\nTEXT = \"#F8FAFC\"\nACCENTS = [\"#38BDF8\", \"#22C55E\", \"#F97316\", \"#A855F7\", \"#F43F5E\", \"#EAB308\"]\nCHART_LAYOUT = dict(\n    paper_bgcolor=BG,\n    plot_bgcolor=BG,",
+        "peekOfCode": "ALL_TOPICS = [ANALYTICS_TOPIC, RISK_TOPIC]\nst.set_page_config(page_title=\"Tax Applications Analytics\", layout=\"wide\")\n# ---- Palette ----\nBG = \"#0F172A\"\nGRID = \"#334155\"\nTEXT = \"#F8FAFC\"\nCHART_LAYOUT = dict(\n    paper_bgcolor=BG,\n    plot_bgcolor=BG,\n    font=dict(color=TEXT, family=\"Inter, sans-serif\"),",
         "detail": "dashboard",
         "documentation": {}
     },
@@ -486,7 +692,7 @@
         "kind": 5,
         "importPath": "dashboard",
         "description": "dashboard",
-        "peekOfCode": "BG = \"#0F172A\"\nGRID = \"#334155\"\nTEXT = \"#F8FAFC\"\nACCENTS = [\"#38BDF8\", \"#22C55E\", \"#F97316\", \"#A855F7\", \"#F43F5E\", \"#EAB308\"]\nCHART_LAYOUT = dict(\n    paper_bgcolor=BG,\n    plot_bgcolor=BG,\n    font=dict(color=TEXT, family=\"Inter, sans-serif\"),\n    margin=dict(l=30, r=20, t=40, b=30),\n    xaxis=dict(gridcolor=GRID, zerolinecolor=GRID),",
+        "peekOfCode": "BG = \"#0F172A\"\nGRID = \"#334155\"\nTEXT = \"#F8FAFC\"\nCHART_LAYOUT = dict(\n    paper_bgcolor=BG,\n    plot_bgcolor=BG,\n    font=dict(color=TEXT, family=\"Inter, sans-serif\"),\n    margin=dict(l=30, r=20, t=40, b=30),\n    xaxis=dict(gridcolor=GRID, zerolinecolor=GRID),\n    yaxis=dict(gridcolor=GRID, zerolinecolor=GRID),",
         "detail": "dashboard",
         "documentation": {}
     },
@@ -495,7 +701,7 @@
         "kind": 5,
         "importPath": "dashboard",
         "description": "dashboard",
-        "peekOfCode": "GRID = \"#334155\"\nTEXT = \"#F8FAFC\"\nACCENTS = [\"#38BDF8\", \"#22C55E\", \"#F97316\", \"#A855F7\", \"#F43F5E\", \"#EAB308\"]\nCHART_LAYOUT = dict(\n    paper_bgcolor=BG,\n    plot_bgcolor=BG,\n    font=dict(color=TEXT, family=\"Inter, sans-serif\"),\n    margin=dict(l=30, r=20, t=40, b=30),\n    xaxis=dict(gridcolor=GRID, zerolinecolor=GRID),\n    yaxis=dict(gridcolor=GRID, zerolinecolor=GRID),",
+        "peekOfCode": "GRID = \"#334155\"\nTEXT = \"#F8FAFC\"\nCHART_LAYOUT = dict(\n    paper_bgcolor=BG,\n    plot_bgcolor=BG,\n    font=dict(color=TEXT, family=\"Inter, sans-serif\"),\n    margin=dict(l=30, r=20, t=40, b=30),\n    xaxis=dict(gridcolor=GRID, zerolinecolor=GRID),\n    yaxis=dict(gridcolor=GRID, zerolinecolor=GRID),\n)",
         "detail": "dashboard",
         "documentation": {}
     },
@@ -504,16 +710,7 @@
         "kind": 5,
         "importPath": "dashboard",
         "description": "dashboard",
-        "peekOfCode": "TEXT = \"#F8FAFC\"\nACCENTS = [\"#38BDF8\", \"#22C55E\", \"#F97316\", \"#A855F7\", \"#F43F5E\", \"#EAB308\"]\nCHART_LAYOUT = dict(\n    paper_bgcolor=BG,\n    plot_bgcolor=BG,\n    font=dict(color=TEXT, family=\"Inter, sans-serif\"),\n    margin=dict(l=30, r=20, t=40, b=30),\n    xaxis=dict(gridcolor=GRID, zerolinecolor=GRID),\n    yaxis=dict(gridcolor=GRID, zerolinecolor=GRID),\n    colorway=ACCENTS,",
-        "detail": "dashboard",
-        "documentation": {}
-    },
-    {
-        "label": "ACCENTS",
-        "kind": 5,
-        "importPath": "dashboard",
-        "description": "dashboard",
-        "peekOfCode": "ACCENTS = [\"#38BDF8\", \"#22C55E\", \"#F97316\", \"#A855F7\", \"#F43F5E\", \"#EAB308\"]\nCHART_LAYOUT = dict(\n    paper_bgcolor=BG,\n    plot_bgcolor=BG,\n    font=dict(color=TEXT, family=\"Inter, sans-serif\"),\n    margin=dict(l=30, r=20, t=40, b=30),\n    xaxis=dict(gridcolor=GRID, zerolinecolor=GRID),\n    yaxis=dict(gridcolor=GRID, zerolinecolor=GRID),\n    colorway=ACCENTS,\n)",
+        "peekOfCode": "TEXT = \"#F8FAFC\"\nCHART_LAYOUT = dict(\n    paper_bgcolor=BG,\n    plot_bgcolor=BG,\n    font=dict(color=TEXT, family=\"Inter, sans-serif\"),\n    margin=dict(l=30, r=20, t=40, b=30),\n    xaxis=dict(gridcolor=GRID, zerolinecolor=GRID),\n    yaxis=dict(gridcolor=GRID, zerolinecolor=GRID),\n)\ndef style(fig):",
         "detail": "dashboard",
         "documentation": {}
     },
@@ -522,7 +719,52 @@
         "kind": 5,
         "importPath": "dashboard",
         "description": "dashboard",
-        "peekOfCode": "CHART_LAYOUT = dict(\n    paper_bgcolor=BG,\n    plot_bgcolor=BG,\n    font=dict(color=TEXT, family=\"Inter, sans-serif\"),\n    margin=dict(l=30, r=20, t=40, b=30),\n    xaxis=dict(gridcolor=GRID, zerolinecolor=GRID),\n    yaxis=dict(gridcolor=GRID, zerolinecolor=GRID),\n    colorway=ACCENTS,\n)\ndef style(fig):",
+        "peekOfCode": "CHART_LAYOUT = dict(\n    paper_bgcolor=BG,\n    plot_bgcolor=BG,\n    font=dict(color=TEXT, family=\"Inter, sans-serif\"),\n    margin=dict(l=30, r=20, t=40, b=30),\n    xaxis=dict(gridcolor=GRID, zerolinecolor=GRID),\n    yaxis=dict(gridcolor=GRID, zerolinecolor=GRID),\n)\ndef style(fig):\n    fig.update_layout(**CHART_LAYOUT)",
+        "detail": "dashboard",
+        "documentation": {}
+    },
+    {
+        "label": "PROVINCE_COLORS",
+        "kind": 5,
+        "importPath": "dashboard",
+        "description": "dashboard",
+        "peekOfCode": "PROVINCE_COLORS = {\n    \"Gauteng\": \"#EAB308\",         # gold\n    \"Free State\": \"#F43F5E\",      # red\n    \"KwaZulu-Natal\": \"#38BDF8\",   # blue\n    \"Limpopo\": \"#22C55E\",         # green\n    \"Western Cape\": \"#A855F7\",    # violet\n    \"Eastern Cape\": \"#F97316\",    # orange\n    \"Mpumalanga\": \"#14B8A6\",      # teal\n    \"North West\": \"#EC4899\",      # pink\n    \"Northern Cape\": \"#94A3B8\",   # slate/grey",
+        "detail": "dashboard",
+        "documentation": {}
+    },
+    {
+        "label": "STATUS_COLORS",
+        "kind": 5,
+        "importPath": "dashboard",
+        "description": "dashboard",
+        "peekOfCode": "STATUS_COLORS = {\n    \"Submitted\": \"#38BDF8\",\n    \"Pending Review\": \"#EAB308\",\n    \"Under Audit\": \"#F97316\",\n    \"Approved\": \"#22C55E\",\n    \"Rejected\": \"#F43F5E\",\n    \"Processing\": \"#A855F7\",\n    \"Refund Issued\": \"#14B8A6\",\n    \"Payment Outstanding\": \"#EC4899\",\n}",
+        "detail": "dashboard",
+        "documentation": {}
+    },
+    {
+        "label": "EMPLOYMENT_COLORS",
+        "kind": 5,
+        "importPath": "dashboard",
+        "description": "dashboard",
+        "peekOfCode": "EMPLOYMENT_COLORS = {\n    \"Full-Time\": \"#38BDF8\",\n    \"Part-Time\": \"#EAB308\",\n    \"Self-Employed\": \"#22C55E\",\n    \"Contractor\": \"#A855F7\",\n    \"Retired\": \"#94A3B8\",\n}\nGENDER_COLORS = {\n    \"Male\": \"#38BDF8\",\n    \"Female\": \"#EC4899\",",
+        "detail": "dashboard",
+        "documentation": {}
+    },
+    {
+        "label": "GENDER_COLORS",
+        "kind": 5,
+        "importPath": "dashboard",
+        "description": "dashboard",
+        "peekOfCode": "GENDER_COLORS = {\n    \"Male\": \"#38BDF8\",\n    \"Female\": \"#EC4899\",\n}\nQUADRANT_COLORS = {\n    \"High Income & High Tax\": \"#22C55E\",\n    \"High Income Only\": \"#EAB308\",\n    \"High Tax Only\": \"#F43F5E\",\n    \"Baseline\": \"#334155\",\n}",
+        "detail": "dashboard",
+        "documentation": {}
+    },
+    {
+        "label": "QUADRANT_COLORS",
+        "kind": 5,
+        "importPath": "dashboard",
+        "description": "dashboard",
+        "peekOfCode": "QUADRANT_COLORS = {\n    \"High Income & High Tax\": \"#22C55E\",\n    \"High Income Only\": \"#EAB308\",\n    \"High Tax Only\": \"#F43F5E\",\n    \"Baseline\": \"#334155\",\n}\n@st.cache_resource\ndef load_config(path=CONFIG_PATH):\n    try:\n        has_kafka_secret = \"kafka\" in st.secrets",
         "detail": "dashboard",
         "documentation": {}
     },
@@ -531,7 +773,7 @@
         "kind": 5,
         "importPath": "dashboard",
         "description": "dashboard",
-        "peekOfCode": "refresh_seconds = st.sidebar.number_input(\n    \"Auto-refresh interval (seconds)\", min_value=1, value=3\n)\npoll_batch_size = st.sidebar.number_input(\n    \"Max messages to drain per refresh\", min_value=1, value=50\n)\nwindow_limit = st.sidebar.number_input(\n    \"Messages to retain per topic\", min_value=10, value=200\n)\n# --- Consumer group handling ---",
+        "peekOfCode": "refresh_seconds = st.sidebar.number_input(\"Auto-refresh interval (seconds)\", min_value=1, value=3)\npoll_batch_size = st.sidebar.number_input(\"Max messages to drain per refresh\", min_value=1, value=100)\nwindow_limit = st.sidebar.number_input(\"Messages to retain per topic\", min_value=50, value=2000)\n# --- Consumer group: ONE stable group by default. Resetting is a\n# deliberate button press, not something that happens automatically every\n# session (that auto-fresh-group behavior was the original clutter cause).\nif \"group_override\" not in st.session_state:\n    st.session_state.group_override = None\nbase_group_id = st.sidebar.text_input(\"Consumer group id\", value=\"dashboard_group\")\nif st.sidebar.button(\"Reset & re-read from earliest\"):",
         "detail": "dashboard",
         "documentation": {}
     },
@@ -540,7 +782,7 @@
         "kind": 5,
         "importPath": "dashboard",
         "description": "dashboard",
-        "peekOfCode": "poll_batch_size = st.sidebar.number_input(\n    \"Max messages to drain per refresh\", min_value=1, value=50\n)\nwindow_limit = st.sidebar.number_input(\n    \"Messages to retain per topic\", min_value=10, value=200\n)\n# --- Consumer group handling ---\n# A stable group id RESUMES from wherever it last left off (including\n# \"already at the end, nothing new to read\" if a prior run drained\n# everything). A fresh group id always starts from the earliest offset on",
+        "peekOfCode": "poll_batch_size = st.sidebar.number_input(\"Max messages to drain per refresh\", min_value=1, value=100)\nwindow_limit = st.sidebar.number_input(\"Messages to retain per topic\", min_value=50, value=2000)\n# --- Consumer group: ONE stable group by default. Resetting is a\n# deliberate button press, not something that happens automatically every\n# session (that auto-fresh-group behavior was the original clutter cause).\nif \"group_override\" not in st.session_state:\n    st.session_state.group_override = None\nbase_group_id = st.sidebar.text_input(\"Consumer group id\", value=\"dashboard_group\")\nif st.sidebar.button(\"Reset & re-read from earliest\"):\n    st.session_state.group_override = f\"{base_group_id}_reset_{int(time.time())}\"",
         "detail": "dashboard",
         "documentation": {}
     },
@@ -549,16 +791,25 @@
         "kind": 5,
         "importPath": "dashboard",
         "description": "dashboard",
-        "peekOfCode": "window_limit = st.sidebar.number_input(\n    \"Messages to retain per topic\", min_value=10, value=200\n)\n# --- Consumer group handling ---\n# A stable group id RESUMES from wherever it last left off (including\n# \"already at the end, nothing new to read\" if a prior run drained\n# everything). A fresh group id always starts from the earliest offset on\n# every topic. Default to fresh so \"no data showing up\" isn't silently\n# caused by a stale group — flip this off once you deliberately want to\n# resume a specific group's progress.",
+        "peekOfCode": "window_limit = st.sidebar.number_input(\"Messages to retain per topic\", min_value=50, value=2000)\n# --- Consumer group: ONE stable group by default. Resetting is a\n# deliberate button press, not something that happens automatically every\n# session (that auto-fresh-group behavior was the original clutter cause).\nif \"group_override\" not in st.session_state:\n    st.session_state.group_override = None\nbase_group_id = st.sidebar.text_input(\"Consumer group id\", value=\"dashboard_group\")\nif st.sidebar.button(\"Reset & re-read from earliest\"):\n    st.session_state.group_override = f\"{base_group_id}_reset_{int(time.time())}\"\n    st.rerun()",
         "detail": "dashboard",
         "documentation": {}
     },
     {
-        "label": "use_fresh_group",
+        "label": "base_group_id",
         "kind": 5,
         "importPath": "dashboard",
         "description": "dashboard",
-        "peekOfCode": "use_fresh_group = st.sidebar.checkbox(\n    \"Use a fresh consumer group (recommended — re-reads all topics from \"\n    \"the earliest offset)\",\n    value=True,\n)\nif \"fresh_group_suffix\" not in st.session_state:\n    st.session_state.fresh_group_suffix = str(int(time.time()))\nif use_fresh_group:\n    group_id = f\"dashboard_consumer_group_{st.session_state.fresh_group_suffix}\"\nelse:",
+        "peekOfCode": "base_group_id = st.sidebar.text_input(\"Consumer group id\", value=\"dashboard_group\")\nif st.sidebar.button(\"Reset & re-read from earliest\"):\n    st.session_state.group_override = f\"{base_group_id}_reset_{int(time.time())}\"\n    st.rerun()\ngroup_id = st.session_state.group_override or base_group_id\nconfig = load_config()\nkafka_conf, sr_conf = split_kafka_and_schema_registry_config(config)\nconsumer = get_consumer(kafka_conf, group_id, ALL_TOPICS)\navro_deserializer = get_avro_deserializer(sr_conf)\nst.sidebar.write(f\"Active group id: `{group_id}`\")",
+        "detail": "dashboard",
+        "documentation": {}
+    },
+    {
+        "label": "group_id",
+        "kind": 5,
+        "importPath": "dashboard",
+        "description": "dashboard",
+        "peekOfCode": "group_id = st.session_state.group_override or base_group_id\nconfig = load_config()\nkafka_conf, sr_conf = split_kafka_and_schema_registry_config(config)\nconsumer = get_consumer(kafka_conf, group_id, ALL_TOPICS)\navro_deserializer = get_avro_deserializer(sr_conf)\nst.sidebar.write(f\"Active group id: `{group_id}`\")\nst.sidebar.caption(\n    \"✅ Schema Registry configured\" if avro_deserializer is not None\n    else \"⚠️ No Schema Registry configured — Avro topics will show a decode warning.\"\n)",
         "detail": "dashboard",
         "documentation": {}
     },
@@ -567,7 +818,7 @@
         "kind": 5,
         "importPath": "dashboard",
         "description": "dashboard",
-        "peekOfCode": "config = load_config()\nkafka_conf, sr_conf = split_kafka_and_schema_registry_config(config)\nconsumer = get_consumer(kafka_conf, group_id, ALL_TOPICS)\navro_deserializer = get_avro_deserializer(sr_conf)\nst.sidebar.write(f\"Active group id: `{group_id}`\")\nif avro_deserializer is None:\n    st.sidebar.caption(\n        \"⚠️ No Schema Registry configured — Avro topics will show a decode \"\n        \"warning instead of data.\"\n    )",
+        "peekOfCode": "config = load_config()\nkafka_conf, sr_conf = split_kafka_and_schema_registry_config(config)\nconsumer = get_consumer(kafka_conf, group_id, ALL_TOPICS)\navro_deserializer = get_avro_deserializer(sr_conf)\nst.sidebar.write(f\"Active group id: `{group_id}`\")\nst.sidebar.caption(\n    \"✅ Schema Registry configured\" if avro_deserializer is not None\n    else \"⚠️ No Schema Registry configured — Avro topics will show a decode warning.\"\n)\nif \"buffers\" not in st.session_state:",
         "detail": "dashboard",
         "documentation": {}
     },
@@ -576,7 +827,7 @@
         "kind": 5,
         "importPath": "dashboard",
         "description": "dashboard",
-        "peekOfCode": "consumer = get_consumer(kafka_conf, group_id, ALL_TOPICS)\navro_deserializer = get_avro_deserializer(sr_conf)\nst.sidebar.write(f\"Active group id: `{group_id}`\")\nif avro_deserializer is None:\n    st.sidebar.caption(\n        \"⚠️ No Schema Registry configured — Avro topics will show a decode \"\n        \"warning instead of data.\"\n    )\nelse:\n    st.sidebar.caption(\"✅ Schema Registry configured — Avro topics supported.\")",
+        "peekOfCode": "consumer = get_consumer(kafka_conf, group_id, ALL_TOPICS)\navro_deserializer = get_avro_deserializer(sr_conf)\nst.sidebar.write(f\"Active group id: `{group_id}`\")\nst.sidebar.caption(\n    \"✅ Schema Registry configured\" if avro_deserializer is not None\n    else \"⚠️ No Schema Registry configured — Avro topics will show a decode warning.\"\n)\nif \"buffers\" not in st.session_state:\n    st.session_state.buffers = {t: [] for t in ALL_TOPICS}\nif \"topic_errors\" not in st.session_state:",
         "detail": "dashboard",
         "documentation": {}
     },
@@ -585,7 +836,7 @@
         "kind": 5,
         "importPath": "dashboard",
         "description": "dashboard",
-        "peekOfCode": "avro_deserializer = get_avro_deserializer(sr_conf)\nst.sidebar.write(f\"Active group id: `{group_id}`\")\nif avro_deserializer is None:\n    st.sidebar.caption(\n        \"⚠️ No Schema Registry configured — Avro topics will show a decode \"\n        \"warning instead of data.\"\n    )\nelse:\n    st.sidebar.caption(\"✅ Schema Registry configured — Avro topics supported.\")\nst.sidebar.write(\"**Subscribed topics:**\")",
+        "peekOfCode": "avro_deserializer = get_avro_deserializer(sr_conf)\nst.sidebar.write(f\"Active group id: `{group_id}`\")\nst.sidebar.caption(\n    \"✅ Schema Registry configured\" if avro_deserializer is not None\n    else \"⚠️ No Schema Registry configured — Avro topics will show a decode warning.\"\n)\nif \"buffers\" not in st.session_state:\n    st.session_state.buffers = {t: [] for t in ALL_TOPICS}\nif \"topic_errors\" not in st.session_state:\n    st.session_state.topic_errors = {t: None for t in ALL_TOPICS}",
         "detail": "dashboard",
         "documentation": {}
     }
