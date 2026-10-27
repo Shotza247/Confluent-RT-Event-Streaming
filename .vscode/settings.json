@@ -7,5 +7,6 @@
         "~/.copilot/skills": true,
         "~/.claude/skills": true,
         "~/.vscode/extensions/synapsevscode.synapse-1.25.0/copilot/skills": true
-    }
+    },
+    "serverpulse.ai.optInShown": true
 }

@@ -1,0 +1,23 @@
+# ==============================================================================
+# Confluent Cloud Client Configuration (client.properties.example)
+# ==============================================================================
+# Instructions:
+# 1. Copy this file to `client.properties`:
+#      Windows PowerShell: Copy-Item client.properties.example client.properties
+#      Linux / macOS:      cp client.properties.example client.properties
+# 2. Fill in your Confluent Cloud cluster endpoint, API key, and API secret below.
+# ==============================================================================
+
+# Kafka Bootstrap Server (Found in Confluent Cloud -> Cluster Settings -> Endpoints)
+bootstrap.servers=pkc-xxxxx.us-east-1.aws.confluent.cloud:9092
+
+# Security Protocol & Authentication Mechanism
+security.protocol=SASL_SSL
+sasl.mechanisms=PLAIN
+
+# Confluent Cloud Cluster API Key & Secret
+sasl.username=YOUR_CONFLUENT_API_KEY
+sasl.password=YOUR_CONFLUENT_API_SECRET
+
+# Recommended Client Configuration
+session.timeout.ms=45000
